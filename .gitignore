@@ -9,3 +9,6 @@
 *.njsproj
 *.sln
 *.sw?
+
+# other's code
+/d2l-zh
