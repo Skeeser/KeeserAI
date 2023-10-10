@@ -16,4 +16,8 @@ print(X == Y)
 
 print(X.sum())
 
-
+"""
+当调用sum运算符时，我们可以指定保持在原始张量的轴数，而不折叠求和的维度。 这将产生一个具有形状(1, 3)的二维张量。
+"""
+X = torch.tensor([[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]])
+print(X.sum(0, keepdim=True), X.sum(1, keepdim=True))
