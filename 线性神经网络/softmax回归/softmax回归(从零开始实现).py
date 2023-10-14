@@ -9,7 +9,7 @@ from Utils.Animator import Animator
 
 # batch_size 256比较合理
 batch_size = 256
-
+"""!!!!!有bug"""
 
 def get_dataloader_workers():
     """使用4个进程来读取数据"""
@@ -46,11 +46,11 @@ class SoftMaxRegression:
 
     def soft_max(self, X):
         X_exp = torch.exp(X)
-        paetition = X_exp.sum(1, keepdim=True)
-        return X_exp / paetition
+        partition = X_exp.sum(1, keepdim=True)
+        return X_exp / partition
 
     def net(self, X):
-        return self.soft_max(torch.matmul(X.reshape(-1, self.W.shape[0]), self.W) + self.b)
+        return self.soft_max(torch.matmul(X.reshape((-1, self.W.shape[0])), self.W) + self.b)
 
     # 输入预测概率分布和对应标签
     def cross_entropy(self, y_hat, y):
@@ -84,6 +84,7 @@ class SoftMaxRegression:
             # 计算梯度并更新参数
             y_hat = net(X)
             l = loss(y_hat, y)
+            print(self.W)
             if isinstance(updater, torch.optim.Optimizer):
                 # 使用pytorch内置的优化器和损失函数
                 updater.zero_grad()
@@ -95,7 +96,6 @@ class SoftMaxRegression:
                 l.sum().backward()
                 updater(X.shape[0])
             metric.add(float(l.sum()), self.accuracy(y_hat, y), y.numel())
-        print(metric[0],  metric[1] , metric[2])
         # 返回训练损失和训练精度
         return metric[0] / metric[2], metric[1] / metric[2]
 
