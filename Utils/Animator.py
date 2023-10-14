@@ -39,7 +39,9 @@ class Animator:
         for x, y, fmt in zip(self.X, self.Y, self.fmts):
             self.axes[0].plot(x, y, fmt)
         self.config_axes()
-        display.display(self.fig)
-        display.clear_output(wait=True)
+        if 'display' in globals():  # 非Notebook环境不调用display()
+            # display:ipython = globals()['display']
+            display.display(self.fig)
+            display.clear_output(wait=True)
 
 
