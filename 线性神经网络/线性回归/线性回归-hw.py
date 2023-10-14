@@ -82,6 +82,6 @@ class LinearRegression:
 
 if __name__ == "__main__":
     lg = LinearRegression()
-    lg.train(num_epochs=100)
+    lg.train(num_epochs=50)
     lg.draw()
 
