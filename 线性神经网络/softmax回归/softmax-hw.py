@@ -5,7 +5,7 @@ from d2l import torch as d2l
 from torch.utils import data
 from torchvision import transforms
 import threading
-
+from Utils.Animator import Animator
 
 batch_size = 256
 
@@ -50,9 +50,20 @@ class SoftMaxRegression:
         # 优化算法
         self.trainer = torch.optim.SGD(self.net.parameters(), lr=0.01)
 
+    def train(self, net, train_iter, test_iter, loss, num_epochs, updater):
+        animator = Animator(xlabel='epoch', xlim=[1, num_epochs], ylim=[0.3, 0.9],
+                            legend=['train loss', 'train acc', 'test acc'])
+        for epoch in range(num_epochs):
+            train_metrics = d2l.train_epoch_ch3(net, train_iter, loss, updater)
+            test_acc = d2l.evaluate_accuracy(net, test_iter)
+            animator.add(epoch + 1, train_metrics + (test_acc,))
+        train_loss, train_acc = train_metrics
+        print(f'train_loss is: {train_loss}')
+        print(f'train_acc is: {train_acc}')
+
     def run(self):
         num_epochs = 10
-        d2l.train_ch3(self.net, train_iter, test_iter, self.loss, num_epochs, self.trainer)
+        self.train(self.net, train_iter, test_iter, self.loss, num_epochs, self.trainer)
         d2l.plt.show()  # 显示绘图
 
 
