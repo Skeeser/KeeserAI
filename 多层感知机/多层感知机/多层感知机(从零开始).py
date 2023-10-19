@@ -42,9 +42,32 @@ class MLP:
         self.W2 = nn.Parameter(torch.randn(self.num_hiddens, self.num_outputs, requires_grad=True) * 0.01)
         self.b2 = nn.Parameter(torch.zeros(self.num_outputs, requires_grad=True))
 
-        params = [self.W1, self.b1, self.W2, self.b2]
+        self.params = [self.W1, self.b1, self.W2, self.b2]
+
+        self.loss = nn.CrossEntropyLoss(reduction='none')
 
     # 激活函数
     def relu(self, X):
+        # 弄成0
         a = torch.zeros_like(X)
         return torch.max(X, a)
+
+    def net(self, X):
+        X = X.reshape((-1, self.num_inputs))
+        H = self.relu(X@self.W1 + self.b1)  # @是矩阵乘法
+        return (H@self.W2 + self.b2)
+
+    def train(self):
+        num_epochs, lr = 10, 0.1
+        updater = torch.optim.SGD(self.params, lr=lr)
+        d2l.train_ch3(self.net, train_iter, test_iter, self.loss, num_epochs, updater)
+
+    def run(self):
+        self.train()
+        d2l.predict_ch3(self.net, test_iter)
+        d2l.plt.show()
+
+
+if __name__ == "__main__":
+    mlp = MLP()
+    mlp.run()
