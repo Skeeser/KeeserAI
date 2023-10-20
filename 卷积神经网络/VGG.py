@@ -7,7 +7,7 @@ batch_size = 128
 train_iter, test_iter = ld.load_data_fashion_mnist(batch_size=batch_size, resize=224)
 
 
-class LeNet:
+class VGG:
     def __init__(self):
         conv_arch = ((1, 64), (1, 128), (2, 256), (2, 512), (2, 512))
         # 弄了个小的网络
@@ -56,5 +56,5 @@ class LeNet:
 
 
 if __name__ == "__main__":
-    ln = LeNet()
+    ln = VGG()
     ln.run()
