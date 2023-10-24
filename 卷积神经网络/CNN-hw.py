@@ -13,10 +13,10 @@ class LeNet:
         # 增加通道的数量对应多个卷积核，多个特征
         # 假设输入28*28
         self.net = nn.Sequential(
-            nn.Conv2d(1, 32, kernel_size=5, padding=2), nn.ReLU(),  # 6@28*28
-            nn.AvgPool2d(kernel_size=2, stride=2),  # 6@14*14
-            nn.Conv2d(32, 64, kernel_size=5, padding=2), nn.ReLU(),  # 16@10*10
-            nn.AvgPool2d(kernel_size=2, stride=2),  # 16@5*5
+            nn.Conv2d(1, 32, kernel_size=5, padding=2), nn.ReLU(),
+            nn.AvgPool2d(kernel_size=2, stride=2),
+            nn.Conv2d(32, 64, kernel_size=5, padding=2), nn.ReLU(),
+            nn.AvgPool2d(kernel_size=2, stride=2),
             nn.Flatten(),
             nn.Linear(64 * 7 * 7, 1024), nn.ReLU(),
             nn.Dropout(0.25),
