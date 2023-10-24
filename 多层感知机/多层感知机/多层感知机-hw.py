@@ -57,7 +57,7 @@ class MLP:
         print(f'train_acc is: {train_acc}')
 
     def run(self):
-        batch_size, lr, num_epochs = 256, 0.1, 10
+        batch_size, lr, num_epochs = 256, 0.01, 10
         loss = nn.CrossEntropyLoss(reduction='none')
         trainer = torch.optim.SGD(self.net.parameters(), lr=lr)
 
@@ -67,4 +67,4 @@ class MLP:
 
 if __name__ == "__main__":
     mlp = MLP()
-    mlp.train()
+    mlp.run()
