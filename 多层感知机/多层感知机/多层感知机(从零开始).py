@@ -53,6 +53,7 @@ class MLP:
         return torch.max(X, a)
 
     def net(self, X):
+        print(X)
         X = X.reshape((-1, self.num_inputs))
         H = self.relu(X@self.W1 + self.b1)  # @是矩阵乘法
         return (H@self.W2 + self.b2)
