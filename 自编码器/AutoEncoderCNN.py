@@ -50,6 +50,7 @@ class AutoEncoder(nn.Module):
             nn.MaxPool2d(2, stride=1)  # (b, 8, 2, 2)
         )
 
+        # 注意此处decoder用到了反卷积
         self.decoder = nn.Sequential(
             nn.ConvTranspose2d(8, 16, 3, stride=2),  # (b, 16, 5, 5)
             nn.ReLU(True),
