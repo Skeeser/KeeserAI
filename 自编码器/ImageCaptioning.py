@@ -1,133 +1,72 @@
-import os
+import numpy as np
 import torch
-from torch import nn, optim
-from torch.autograd import Variable
-from torchvision import transforms, datasets
-from torch.utils.data import DataLoader
-import torch.nn.functional as F
-from torchvision.utils import save_image
-from d2l import torch as d2l
+import matplotlib.pyplot as plt
+from torchvision import datasets, transforms, models
+from torch.utils.data import Dataset, DataLoader
+import json
+from sklearn.utils import shuffle
+from PIL import Image, ImageOps
 
 
-# 加载数据集
-def get_data():
-    data_tf = transforms.Compose([transforms.ToTensor(), transforms.Normalize([0.5], [0.5])])
-    train_data = datasets.MNIST(root="../resource", train=True, transform=data_tf, download=True)
-    train_loader = DataLoader(train_data, shuffle=True, batch_size=batch_size, drop_last=True)
-    return train_loader
+# caption文件预处理,默认输入Size为-1
+def img_cap_list(Size: int = -1):
+    # 图像路径和情景识别json文件路径
+    image_path = "../resource/coco\\train2014\\"
+    cap_train_json_path = "../resource/coco\\annotations\\captions_train2014.json"
+    # 打开情景识别文件并加载
+    with open(cap_train_json_path, 'r') as f:
+        annotations = json.load(f)
+    # 对图像的文件名和其caption文本建立列表
+    all_captions = []
+    all_img_name_vector = []
+    # 从情景识别文件数据中遍历annotations数组的每个元素
+    # 元素包含三个标签，分别是image_id,id,caption,对应图像id,id类型编号和文本描述
+    for annot in annotations['annotations']:
+        # 从元素中提取caption标签内容,前后加上<start>和<end>
+        caption = '<start> ' + annot['caption'] + ' <end>'
+        # 提取image_id标签内容,对应id值
+        image_id = annot['image_id']
+        # 从image_id转为图像文件名称
+        #  '%012d'对应000000000000,取余image_id即image_id补齐12位0
+        full_coco_image_path = image_path + 'COCO_train2014_' + '%012d.jpg' % (image_id)
+        # 将文件名和caption文本添加到对应列表中
+        all_img_name_vector.append(full_coco_image_path)
+        all_captions.append(caption)
+    # 同时打乱文本和图片顺序
+    train_captions, img_name_vector = shuffle(all_captions, all_img_name_vector, random_state=1)
+    # total 414113,注意此时一个图像对应的文本可能不唯一,但按照文本计算数量
+    # Size为-1提取全部信息
+    if Size == -1:
+        train_captions = train_captions[:]
+        img_name_vector = img_name_vector[:]
+    # 否则提取Size数量的图片名和caption文本
+    else:
+        train_captions = train_captions[:Size]
+        img_name_vector = img_name_vector[:Size]
+    return train_captions, img_name_vector
 
 
-class VAE(nn.Module):
-    def __init__(self):
-        super(VAE, self).__init__()
-        # self.fc1 = nn.Linear(784, 400)
-        self.fc1 = nn.Sequential(nn.Linear(784, 256),
-                                     nn.ReLU(),
-                                     nn.Linear(256, 512),
-                                     nn.Tanh())
+# pytorch版本加载图片函数
+def load_image(image_path):
+    # 定义图片的transform
+    # 为了适应ResNet网络,图片大小为244*244,并转为张量形式
+    transform = transforms.Compose([
+        transforms.Resize((224, 224)),
+        transforms.ToTensor(),
+    ])
+    # 通过RGB格式加载图片
+    image = Image.open(image_path).convert('RGB')
+    # 图片类型转换
+    image = transform(image)
+    # 返回图片和图片路径
+    return image, image_path
 
 
-        self.fc21 = nn.Linear(512, 20)    # 均值
-        self.fc22 = nn.Linear(512, 20)    # 方差
-        self.fc3 = nn.Sequential(nn.Linear(20, 512),
-                                     nn.ReLU(),
-                                     nn.Linear(512, 784),
-                                     nn.Tanh())
-
-
-    def encoder(self, x):
-        h1 = self.fc1(x)
-        mu = self.fc21(h1)
-        logvar = self.fc22(h1)
-        return mu, logvar
-
-    def decoder(self, z):
-        x = self.fc3(z)
-        return x
-
-    # 重新参数化
-    def reparametrize(self, mu, logvar):
-        std = logvar.mul(0.5).exp_()   # 计算标准差
-        if torch.cuda.is_available():
-            eps = torch.cuda.FloatTensor(std.size()).normal_()    # 从标准的正态分布中随机采样一个eps
-        else:
-            eps = torch.FloatTensor(std.size()).normal_()
-        eps = Variable(eps)
-        return eps.mul(std).add_(mu)
-
-    def forward(self, x):
-        mu, logvar = self.encoder(x)
-        z = self.reparametrize(mu, logvar)
-        return self.decoder(z), mu, logvar
-
-
-def loss_function(recon_x, x, mu, logvar):
-    MSE = reconstruction_function(recon_x, x)
-    # loss = 0.5 * sum(1 + log(sigma^2) - mu^2 - sigma^2)
-    KLD_element = mu.pow(2).add_(logvar.exp()).mul_(-1).add_(1).add_(logvar)
-    KLD = torch.sum(KLD_element).mul_(-0.5)
-    # print(f"MSE: {MSE}, KLD: {KLD}")
-    # KL divergence
-    return MSE + KLD, MSE, KLD
-
-
-def to_img(x):
-    x = x[0:show_size]
-    x = (x + 1.) * 0.5
-    x = x.clamp(0, 1)
-    x = x.view(x.size(0), 1, 28, 28)
-    return x
-
-
-if __name__ == '__main__':
-    # 超参数设置
-    batch_size = 128
-    show_size = 10
-    lr = 1e-3
-    epoches = 100
-
-    model = VAE()
-    if torch.cuda.is_available():
-        model.cuda()
-
-    train_data = get_data()
-
-    reconstruction_function = nn.MSELoss(reduction='sum')
-    optimizer = optim.Adam(model.parameters(), lr=lr)
-    animator1 = d2l.Animator(xlabel='epoch', xlim=[1, epoches],
-                            legend=['MSE'])
-    animator2 = d2l.Animator(xlabel='epoch', xlim=[1, epoches],
-                            legend=['KLD'])
-    num_batches = len(train_data)
-    for epoch in range(epoches):
-        # 在训练过程中逐渐降低学习率，以便在接近训练结束时更细致地调整模型参数，使得模型更容易收敛到最优解。
-        if epoch in [epoches * 0.25, epoches * 0.5]:
-            for param_group in optimizer.param_groups:
-                param_group['lr'] *= 0.1
-        for i, (img, _) in enumerate(train_data):
-            img = img.view(img.size(0), -1)
-            img = Variable(img)
-            if torch.cuda.is_available():
-                img = img.cuda()
-            # forward
-            output, mu, logvar = model(img)
-            loss_l = loss_function(output, img, mu, logvar)
-            loss = loss_l[0]/img.size(0)
-            mse = loss_l[1]/img.size(0)
-            kld = loss_l[2]/img.size(0)
-            # backward
-            optimizer.zero_grad()
-            loss.backward()
-            optimizer.step()
-            if (i + 1) % (num_batches // 5) == 0 or i == num_batches - 1:
-                animator1.add(epoch + (i + 1) / num_batches, (mse.cpu().data, None))
-                animator2.add(epoch + (i + 1) / num_batches, (kld.cpu().data, None))
-        print("epoch=", epoch, loss.data.float())
-        if (epoch+1) % 10 == 0:
-            print("epoch = {}, loss is {}".format(epoch+1, loss.data))
-            pic = to_img(output.cpu().data)
-            if not os.path.exists('../resource/vae_img1'):
-                os.mkdir('../resource/vae_img1')
-            save_image(pic, '../resource/vae_img1/image_{}.png'.format(epoch + 1))
-    # torch.save(model, '../model/vae.pth')
-    d2l.plt.show()
+# 不修改图片版本
+def load_image_v2(image_path):
+    transform = transforms.Compose([
+        transforms.ToTensor()
+    ])
+    image = Image.open(image_path).convert('RGB')
+    image = transform(image)
+    return image, image_path
