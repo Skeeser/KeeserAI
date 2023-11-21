@@ -102,19 +102,21 @@ class AutoEncoder(nn.Module):
         # 超参数设置
         lr = 1e-2
         weight_decay = 1e-5
-        epoches = 100
+        epoches = 1
         self.train_sl(train_iter, epoches, lr, weight_decay)
+        torch.save(model, '../model/autoencoder.pth')
+        # code = Variable(torch.FloatTensor([[1.19, -3.36, 2.06]]).cuda())
+        # decode = self.decoder(code)
+        # decode_img = to_img(decode).squeeze()
+        # decode_img = decode_img.data.cpu().data * 255
+        # plt.imshow(decode_img.astype('uint8'), cmap='gray')
+        # save_image(decode_img, '../resource/simple_autoencoder/image_code.png')
+        # plt.show()
 
 
 if __name__ == "__main__":
     model = AutoEncoder()
     model.run()
 
-    torch.save(model, '../model/autoencoder.pth')
-    code = Variable(torch.FloatTensor([[1.19, -3.36, 2.06]]).cuda())
-    decode = model.decoder(code)
-    decode_img = to_img(decode).squeeze()
-    decode_img = decode_img.data.cpu().data * 255
-    plt.imshow(decode_img.astype('uint8'), cmap='gray')
-    save_image(decode_img, '../resource/simple_autoencoder/image_code.png')
-    plt.show()
+
+

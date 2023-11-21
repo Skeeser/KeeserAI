@@ -6,6 +6,7 @@ from torchvision import transforms, datasets
 from torch.utils.data import DataLoader
 import torch.nn.functional as F
 from torchvision.utils import save_image
+from d2l import torch as d2l
 
 
 # 加载数据集
@@ -67,10 +68,11 @@ def loss_function(recon_x, x, mu, logvar):
     KLD = torch.sum(KLD_element).mul_(-0.5)
     # print(f"MSE: {MSE}, KLD: {KLD}")
     # KL divergence
-    return MSE + KLD
+    return MSE + KLD, MSE, KLD
 
 
 def to_img(x):
+    x = x[0:show_size]
     x = (x + 1.) * 0.5
     x = x.clamp(0, 1)
     x = x.view(x.size(0), 1, 28, 28)
@@ -80,8 +82,9 @@ def to_img(x):
 if __name__ == '__main__':
     # 超参数设置
     batch_size = 128
+    show_size = 10
     lr = 1e-3
-    epoches = 10
+    epoches = 100
 
     model = VAE()
     if torch.cuda.is_available():
@@ -91,20 +94,34 @@ if __name__ == '__main__':
 
     reconstruction_function = nn.MSELoss(reduction='sum')
     optimizer = optim.Adam(model.parameters(), lr=lr)
-
+    animator1 = d2l.Animator(xlabel='epoch', xlim=[1, epoches],
+                            legend=['MSE'])
+    animator2 = d2l.Animator(xlabel='epoch', xlim=[1, epoches],
+                            legend=['KLD'])
+    num_batches = len(train_data)
     for epoch in range(epoches):
-        for img, _ in train_data:
+        # 在训练过程中逐渐降低学习率，以便在接近训练结束时更细致地调整模型参数，使得模型更容易收敛到最优解。
+        if epoch in [epoches * 0.25, epoches * 0.5]:
+            for param_group in optimizer.param_groups:
+                param_group['lr'] *= 0.1
+        for i, (img, _) in enumerate(train_data):
             img = img.view(img.size(0), -1)
             img = Variable(img)
             if torch.cuda.is_available():
                 img = img.cuda()
             # forward
             output, mu, logvar = model(img)
-            loss = loss_function(output, img, mu, logvar)/img.size(0)
+            loss_l = loss_function(output, img, mu, logvar)
+            loss = loss_l[0]/img.size(0)
+            mse = loss_l[1]/img.size(0)
+            kld = loss_l[2]/img.size(0)
             # backward
             optimizer.zero_grad()
             loss.backward()
             optimizer.step()
+            if (i + 1) % (num_batches // 5) == 0 or i == num_batches - 1:
+                animator1.add(epoch + (i + 1) / num_batches, (mse.cpu().data, None))
+                animator2.add(epoch + (i + 1) / num_batches, (kld.cpu().data, None))
         print("epoch=", epoch, loss.data.float())
         if (epoch+1) % 10 == 0:
             print("epoch = {}, loss is {}".format(epoch+1, loss.data))
@@ -112,4 +129,5 @@ if __name__ == '__main__':
             if not os.path.exists('../resource/vae_img1'):
                 os.mkdir('../resource/vae_img1')
             save_image(pic, '../resource/vae_img1/image_{}.png'.format(epoch + 1))
-    torch.save(model, '../model/vae.pth')
+    # torch.save(model, '../model/vae.pth')
+    d2l.plt.show()
