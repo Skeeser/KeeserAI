@@ -25,9 +25,6 @@ def load_data_fashion_mnist(batch_size=256, resize=None):
                             num_workers=get_dataloader_workers()))
 
 
-
-
-
 def load_data_mnist(batch_size=256, resize=None):
     """下载Fashion-MNIST数据集，然后将其加载到内存中"""
     trans = [transforms.ToTensor()]
