@@ -9,6 +9,20 @@ from sklearn.utils import shuffle
 from PIL import Image, ImageOps
 import torchtext
 from sklearn.model_selection import train_test_split
+from d2l import torch as d2l
+
+# 定义批处理大小
+batch = 16
+# 定义最大词汇表容量
+max_token = 5000
+# 定义句子的最大长度
+MAX_LEN = 30
+# 定义自动填充内容
+PAD = 0
+# 定义要处理的文本数量
+data_size = 10000
+# 定义图片特征向量
+img_feature = 256
 
 
 # caption文件预处理,默认输入Size为-1
@@ -100,7 +114,7 @@ def get_token(train_caption):
     # 最大词汇表容量为5000
     tokenizer = torchtext.vocab.build_vocab_from_iterator(map(tokenizer, train_caption),
                                         specials=['<unknown_word>'], min_freq=1,
-                                        max_tokens=top_k)
+                                        max_tokens=max_token)
     # 返回词汇表
     return tokenizer
 
@@ -217,7 +231,7 @@ def get_ds(Cap, img, batch):
 
 # 取data_size条数据集信息
 train_captions, img_name_vector = img_cap_list(Size=data_size)
-tokenizer, train_loader, val_loader, img_name_val, cap_val, img_name_train, cap_train = get_ds(train_captions,img_name_vector,batch)
+tokenizer, train_loader, val_loader, img_name_val, cap_val, img_name_train, cap_train = get_ds(train_captions, img_name_vector, batch)
 
 
 # 实现看图说话模型
@@ -226,30 +240,85 @@ class ImageCaption(nn.Module):
         super(ImageCaption, self).__init__()
         # 编码器是CNN网络
         self.encoder = nn.Sequential(models.resnet152(),
-                                     nn.Linear(2048, img_ev_size))
+                                     nn.Linear(2048, img_feature),
+                                     nn.BatchNorm1d(img_feature, momentum=0.01)) # 归一正则化
 
         # 解码器是LSTM网络
-        self.decoder = None
-
+        self.decoder = nn.Sequential(nn.LSTM(input_size=img_feature, hidden_size=512, num_layers=1, batch_first=True),
+                                     nn.Linear(512, max_token),
+                                     )
+        # 编码
+        self.emmbing = nn.Embedding(max_token, img_feature)
 
     def encoder_func(self, x):
-        pass
+        z = self.encoder(x)
+        return z
 
-    def decoder_func(self, x):
-        pass
+    def decoder_func(self, features, y, lengths):
+        # 对给定词序列进行编码
+        y = self.embbing(y)
+        # 将图片的256维特征向量和每句话的60个256维词向量拼接到一起,形成[61,256]总词向量
+        use = []
+        for i in range(len(y)):
+            # 注意图片特征向量在前面,因为其要作为LSTM层的初始状态
+            temp = torch.cat((features[i].unsqueeze(0), y[i]), dim=0)
+            # 保存向量
+            use.append(temp)
+        # 结果为列表,利用stack函数将其转变为tensor,第一维为批处理大小
+        use = torch.stack(use, dim=0)
+        use = use.to(device)
+        # 为了减少批处理操作的无效PAD量,使用pack_padded_sequence进行压缩
+        # 压缩输入到LSTM的词向量,去除空PAD
+        x = pack_padded_sequence(use, lengths, batch_first=True)
+        # 进行LSTM层运算,获得预测词序列
+        x, (h, c) = self.LSTM(x)
+        # 为了softmax使用全连接层将512维向量映射为5000维向量,对应词汇表的每个单词的对应分配值
+        # CrossEntropyLoss会先进行softmax函数运算，无需加入softmax层
+        y_pred = self.linear(x[0])
+        return y_pred
+
+    def forward(self, x, y, lengths):
+        x = self.encoder(x)
+        y_pred = self.decoder(x, y, lengths)
+        return y_pred
+
+
+def train(lr, epoches):
+    model = ImageCaption()
+    loss_func = nn.CrossEntropyLoss()
+    optimizer = optim.Adam(model.parameters(), lr=lr)
+
+    animator = d2l.Animator(xlabel='epoch', xlim=[1, epoches],
+                             legend=['train loss', 'train acc'])
+
+    num_batches = len(train_loader)
+    for epoch in range(epoches):
+        # 在训练过程中逐渐降低学习率，以便在接近训练结束时更细致地调整模型参数，使得模型更容易收敛到最优解。
+        if epoch in [epoches * 0.25, epoches * 0.5]:
+            for param_group in optimizer.param_groups:
+                param_group['lr'] *= 0.1
+
+        for i, (x, y, lengths, img_names) in enumerate(train_loader):
+            # # backward
+            # optimizer.zero_grad()
+            # loss.backward()
+            # optimizer.step()
+            if (i + 1) % (num_batches // 5) == 0 or i == num_batches - 1:
+                # animator1.add(epoch + (i + 1) / num_batches, (mse.cpu().data, None))
+               pass
+
+        # print("epoch=", epoch, loss.data.float())
 
 
 if __name__ == "__main__":
-    # 定义批处理大小
-    batch = 16
-    # 定义最大词汇表容量
-    top_k = 5000
-    # 定义句子的最大长度
-    MAX_LEN = 30
-    # 定义自动填充内容
-    PAD = 0
-    # 定义要处理的文本数量
-    data_size = 10000
-    # 定义图片特征向量
-    img_ev_size = 256
+    if torch.cuda.is_available():
+        device = torch.device("cuda:0")
+    else:
+        device = torch.device("cpu")
+
+
+    lr = 1e-3
+    epoches = 100
+    train(lr, epoches)
+
 
