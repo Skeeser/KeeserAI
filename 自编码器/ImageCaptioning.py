@@ -10,6 +10,12 @@ from PIL import Image, ImageOps
 import torchtext
 from sklearn.model_selection import train_test_split
 from d2l import torch as d2l
+from torch.nn.utils.rnn import pack_padded_sequence, pad_packed_sequence
+
+device = torch.device("cpu")
+if torch.cuda.is_available():
+    device = torch.device("cuda:0")
+
 
 # 定义批处理大小
 batch = 16
@@ -216,39 +222,41 @@ def get_ds(Cap, img, batch):
     # captions的预处理
     tokenizer, cap = captions_preprocess(Cap)
     # 将数据集分割为训练数据集和测试数据集,数量比值为4:1
-    img_name_train, img_name_val, cap_train, cap_val = train_test_split(
+    img_name_train, img_name_test, cap_train, cap_val = train_test_split(
         img, cap, test_size=0.2, random_state=0)
     # 获得训练数据集、加载器和测试数据集、加载器
     # 注意不打乱顺序(前面已打乱过,训练集batch_size大小为16,太大会导致内存不够用，测试机为训练集batch_size大小的四分之一)
     train_dataset = CustomDataset(img_name_train, cap_train)
     train_loader = DataLoader(train_dataset, batch_size=batch, shuffle=False, collate_fn=collate_fn)
     print(len(train_dataset))
-    val_dataset = CustomDataset(img_name_val, cap_val)
-    val_loader = DataLoader(val_dataset, batch_size=int(batch / 4), shuffle=False, collate_fn=collate_fn)
+    test_dataset = CustomDataset(img_name_test, cap_val)
+    test_loader = DataLoader(test_dataset, batch_size=int(batch / 4), shuffle=False, collate_fn=collate_fn)
     # 返回结果
-    return tokenizer, train_loader, val_loader, img_name_val, cap_val, img_name_train, cap_train
+    return tokenizer, train_loader, test_loader, img_name_test, cap_val, img_name_train, cap_train
 
 
 # 取data_size条数据集信息
 train_captions, img_name_vector = img_cap_list(Size=data_size)
-tokenizer, train_loader, val_loader, img_name_val, cap_val, img_name_train, cap_train = get_ds(train_captions, img_name_vector, batch)
+tokenizer, train_loader, test_loader, img_name_test, cap_val, img_name_train, cap_train = get_ds(train_captions, img_name_vector, batch)
 
 
 # 实现看图说话模型
 class ImageCaption(nn.Module):
     def __init__(self):
         super(ImageCaption, self).__init__()
+        resnet = models.resnet152()
+        resnet.fc = nn.Linear(2048, img_feature)
+
         # 编码器是CNN网络
-        self.encoder = nn.Sequential(models.resnet152(),
-                                     nn.Linear(2048, img_feature),
-                                     nn.BatchNorm1d(img_feature, momentum=0.01)) # 归一正则化
+        self.encoder = nn.Sequential(resnet,
+                                     nn.BatchNorm1d(img_feature, momentum=0.01))  # 归一正则化
 
         # 解码器是LSTM网络
         self.decoder = nn.Sequential(nn.LSTM(input_size=img_feature, hidden_size=512, num_layers=1, batch_first=True),
                                      nn.Linear(512, max_token),
                                      )
         # 编码
-        self.emmbing = nn.Embedding(max_token, img_feature)
+        self.embedding = nn.Embedding(max_token, img_feature)
 
     def encoder_func(self, x):
         z = self.encoder(x)
@@ -256,13 +264,12 @@ class ImageCaption(nn.Module):
 
     def decoder_func(self, features, y, lengths):
         # 对给定词序列进行编码
-        y = self.embbing(y)
+        y = self.embedding(y)
         # 将图片的256维特征向量和每句话的60个256维词向量拼接到一起,形成[61,256]总词向量
         use = []
         for i in range(len(y)):
             # 注意图片特征向量在前面,因为其要作为LSTM层的初始状态
             temp = torch.cat((features[i].unsqueeze(0), y[i]), dim=0)
-            # 保存向量
             use.append(temp)
         # 结果为列表,利用stack函数将其转变为tensor,第一维为批处理大小
         use = torch.stack(use, dim=0)
@@ -271,16 +278,37 @@ class ImageCaption(nn.Module):
         # 压缩输入到LSTM的词向量,去除空PAD
         x = pack_padded_sequence(use, lengths, batch_first=True)
         # 进行LSTM层运算,获得预测词序列
-        x, (h, c) = self.LSTM(x)
+        # x, (h, c) = self.LSTM(x)
         # 为了softmax使用全连接层将512维向量映射为5000维向量,对应词汇表的每个单词的对应分配值
         # CrossEntropyLoss会先进行softmax函数运算，无需加入softmax层
-        y_pred = self.linear(x[0])
+        y_pred = self.decoder(x)
         return y_pred
 
     def forward(self, x, y, lengths):
-        x = self.encoder(x)
-        y_pred = self.decoder(x, y, lengths)
+        x = self.encoder_func(x)
+        y_pred = self.decoder_func(x, y, lengths)
         return y_pred
+
+
+# test的loss的评估函数
+def evaluate_loss_gpu(net, test_loader, loss_func, device):
+    """使用GPU计算模型在数据集上的精度"""
+    if isinstance(net, nn.Module):
+        net.eval()  # 设置为评估模式
+        if not device:
+            device = next(iter(net.parameters())).device
+
+    with torch.no_grad():
+        metric = d2l.Accumulator(2)
+        for i, (x, y, lengths, img_names) in enumerate(test_loader):
+            x = x.to(device)
+            y = y.to(device)
+            y_pred = net.forward(x, y, lengths)
+            y = pack_padded_sequence(y, lengths, batch_first=True)
+            loss_sum = loss_func(y_pred, y[0]).sum()
+            metric.add(loss_sum.cpu().data * lengths, lengths)
+
+    return metric[0] / metric[1]
 
 
 def train(lr, epoches):
@@ -293,28 +321,42 @@ def train(lr, epoches):
 
     num_batches = len(train_loader)
     for epoch in range(epoches):
+        # 训练损失之和，样本数
+        metric = d2l.Accumulator(2)
+
         # 在训练过程中逐渐降低学习率，以便在接近训练结束时更细致地调整模型参数，使得模型更容易收敛到最优解。
         if epoch in [epoches * 0.25, epoches * 0.5]:
             for param_group in optimizer.param_groups:
                 param_group['lr'] *= 0.1
 
         for i, (x, y, lengths, img_names) in enumerate(train_loader):
-            # # backward
-            # optimizer.zero_grad()
-            # loss.backward()
-            # optimizer.step()
-            if (i + 1) % (num_batches // 5) == 0 or i == num_batches - 1:
-                # animator1.add(epoch + (i + 1) / num_batches, (mse.cpu().data, None))
-               pass
+            x = x.to(device)
+            y = y.to(device)
 
-        # print("epoch=", epoch, loss.data.float())
+            y_pred = model.forward(x, y, lengths)
+            y = pack_padded_sequence(y, lengths, batch_first=True)
+            loss_sum = loss_func(y_pred, y[0]).sum()
+            # backward
+            optimizer.zero_grad()
+            loss_sum.backward()
+            optimizer.step()
+            with torch.no_grad():
+                metric.add(loss_sum.cpu().data * lengths, lengths)
+
+            train_l = metric[0] / metric[1]
+
+            if (i + 1) % (num_batches // 5) == 0 or i == num_batches - 1:
+                animator.add(epoch + (i + 1) / num_batches, (train_l, None))
+
+        test_loss = evaluate_loss_gpu(model.forward, test_loader, loss_func, device)
+        animator.add(epoch + 1, (None, test_loss))
+
+        torch.cuda.empty_cache()
+        print("epoch=", epoch, loss_sum.data.float())
 
 
 if __name__ == "__main__":
-    if torch.cuda.is_available():
-        device = torch.device("cuda:0")
-    else:
-        device = torch.device("cpu")
+
 
 
     lr = 1e-3
