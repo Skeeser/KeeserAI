@@ -11,14 +11,17 @@ import torchtext
 from sklearn.model_selection import train_test_split
 from d2l import torch as d2l
 from torch.nn.utils.rnn import pack_padded_sequence, pad_packed_sequence
+from ImageCaptionNet import ImageCaption
 
-device = torch.device("cpu")
 if torch.cuda.is_available():
+    print("cuda")
     device = torch.device("cuda:0")
-
+else:
+    print("cpu")
+    device = torch.device("cpu")
 
 # 定义批处理大小
-batch = 16
+batch = 8
 # 定义最大词汇表容量
 max_token = 5000
 # 定义句子的最大长度
@@ -240,56 +243,6 @@ train_captions, img_name_vector = img_cap_list(Size=data_size)
 tokenizer, train_loader, test_loader, img_name_test, cap_val, img_name_train, cap_train = get_ds(train_captions, img_name_vector, batch)
 
 
-# 实现看图说话模型
-class ImageCaption(nn.Module):
-    def __init__(self):
-        super(ImageCaption, self).__init__()
-        resnet = models.resnet152()
-        resnet.fc = nn.Linear(2048, img_feature)
-
-        # 编码器是CNN网络
-        self.encoder = nn.Sequential(resnet,
-                                     nn.BatchNorm1d(img_feature, momentum=0.01))  # 归一正则化
-
-        # 解码器是LSTM网络
-        self.decoder = nn.Sequential(nn.LSTM(input_size=img_feature, hidden_size=512, num_layers=1, batch_first=True),
-                                     nn.Linear(512, max_token),
-                                     )
-        # 编码
-        self.embedding = nn.Embedding(max_token, img_feature)
-
-    def encoder_func(self, x):
-        z = self.encoder(x)
-        return z
-
-    def decoder_func(self, features, y, lengths):
-        # 对给定词序列进行编码
-        y = self.embedding(y)
-        # 将图片的256维特征向量和每句话的60个256维词向量拼接到一起,形成[61,256]总词向量
-        use = []
-        for i in range(len(y)):
-            # 注意图片特征向量在前面,因为其要作为LSTM层的初始状态
-            temp = torch.cat((features[i].unsqueeze(0), y[i]), dim=0)
-            use.append(temp)
-        # 结果为列表,利用stack函数将其转变为tensor,第一维为批处理大小
-        use = torch.stack(use, dim=0)
-        use = use.to(device)
-        # 为了减少批处理操作的无效PAD量,使用pack_padded_sequence进行压缩
-        # 压缩输入到LSTM的词向量,去除空PAD
-        x = pack_padded_sequence(use, lengths, batch_first=True)
-        # 进行LSTM层运算,获得预测词序列
-        # x, (h, c) = self.LSTM(x)
-        # 为了softmax使用全连接层将512维向量映射为5000维向量,对应词汇表的每个单词的对应分配值
-        # CrossEntropyLoss会先进行softmax函数运算，无需加入softmax层
-        y_pred = self.decoder(x)
-        return y_pred
-
-    def forward(self, x, y, lengths):
-        x = self.encoder_func(x)
-        y_pred = self.decoder_func(x, y, lengths)
-        return y_pred
-
-
 # test的loss的评估函数
 def evaluate_loss_gpu(net, test_loader, loss_func, device):
     """使用GPU计算模型在数据集上的精度"""
@@ -306,26 +259,31 @@ def evaluate_loss_gpu(net, test_loader, loss_func, device):
             y_pred = net.forward(x, y, lengths)
             y = pack_padded_sequence(y, lengths, batch_first=True)
             loss_sum = loss_func(y_pred, y[0]).sum()
-            metric.add(loss_sum.cpu().data * lengths, lengths)
+            metric.add(loss_sum.item() * x.shape[0], x.shape[0])
 
     return metric[0] / metric[1]
 
 
 def train(lr, epoches):
     model = ImageCaption()
+    # if torch.cuda.is_available():
+    #     model.cuda()
+    # model = model.to(device)
     loss_func = nn.CrossEntropyLoss()
-    optimizer = optim.Adam(model.parameters(), lr=lr)
+    # optimizer = optim.Adam(model.parameters(), lr=lr)
+    optimizer = optim.Adam(model.parameters(), lr=lr, weight_decay=0.001)
 
     animator = d2l.Animator(xlabel='epoch', xlim=[1, epoches],
-                             legend=['train loss', 'train acc'])
+                             legend=['train loss', 'test loss'])
 
     num_batches = len(train_loader)
     for epoch in range(epoches):
+        model.train()
         # 训练损失之和，样本数
         metric = d2l.Accumulator(2)
 
         # 在训练过程中逐渐降低学习率，以便在接近训练结束时更细致地调整模型参数，使得模型更容易收敛到最优解。
-        if epoch in [epoches * 0.25, epoches * 0.5]:
+        if epoch in [epoches * 0.5, epoches * 0.75]:
             for param_group in optimizer.param_groups:
                 param_group['lr'] *= 0.1
 
@@ -341,26 +299,102 @@ def train(lr, epoches):
             loss_sum.backward()
             optimizer.step()
             with torch.no_grad():
-                metric.add(loss_sum.cpu().data * lengths, lengths)
+                metric.add(loss_sum.item() * x.shape[0], x.shape[0])
 
             train_l = metric[0] / metric[1]
 
             if (i + 1) % (num_batches // 5) == 0 or i == num_batches - 1:
                 animator.add(epoch + (i + 1) / num_batches, (train_l, None))
+                print("loss=", train_l)
 
-        test_loss = evaluate_loss_gpu(model.forward, test_loader, loss_func, device)
+        test_loss = evaluate_loss_gpu(model, test_loader, loss_func, device)
         animator.add(epoch + 1, (None, test_loss))
-
         torch.cuda.empty_cache()
-        print("epoch=", epoch, loss_sum.data.float())
+        print(f"epoch={epoch + 1}, train_loss={train_l}, test_loss={test_loss}")
+    torch.save(model, '../model/ImageCaption.pth')
+
+
+def value_model():
+    model = torch.load('../model/ImageCaption.pth')
+    model.eval()
+    # 映射
+    index_to_word = tokenizer.get_itos()
+    # 加载模型
+    with torch.no_grad():
+        for num, (x, y, lengths, img_names) in enumerate(train_loader):
+            if num == 48:
+                x = x.to(device)
+                y = y.to(device)
+                res = []
+                index = 5
+                y_pre = model.forward(x, y, lengths)
+
+                for i in range(lengths[index]):
+                    temp = min((i * 8 + index), len(y_pre) - 1)
+                    # 获得当前词的下一个预测词
+                    predicted = torch.argmax(y_pre[temp]).item()
+                    # 保存预测词
+                    res.append(index_to_word[predicted])
+                print(res)
+
+                right = []
+                for i in range(lengths[index]):
+                    # 获得当前词的下一个预测词
+                    predicted = y[index][i]
+                    # 保存预测词
+                    right.append(index_to_word[predicted])
+                print(right)
+
+                # break
+                #
+                # feature = model.encoder_func(x)
+                # outputs = model.infer_sl(feature[index:index+1])
+                # for i in range(len(outputs)):
+                #     print(index_to_word[outputs[i]])
+                img = load_image(img_names[index])
+                out = img[0].numpy().transpose((1, 2, 0))
+                plt.imshow(out)
+                plt.show()
+                break
+
+
+def predict():
+    model = torch.load('../model/ImageCaption.pth')
+    model.eval()
+    # 映射
+    index_to_word = tokenizer.get_itos()
+    # 加载模型
+    with torch.no_grad():
+        for num, (x, y, lengths, img_names) in enumerate(train_loader):
+            if num == 0:
+                x = x.to(device)
+                # y = y.to(device)
+                res = []
+                index = 6
+                feature = model.encoder_func(x)
+                outputs = model.infer_sl(feature)
+                # outputs = model.infer_sl(feature)
+                for j in range(8):
+                    index = j
+                    for i in range(len(outputs[index])):
+                        res.append(index_to_word[outputs[index][i]])
+                    print(res)
+                    res = []
+
+                img = load_image(img_names[index])
+                out = img[0].numpy().transpose((1, 2, 0))
+                plt.imshow(out)
+                plt.show()
+                break
 
 
 if __name__ == "__main__":
+    IF_TRAIN = True
 
-
-
-    lr = 1e-3
-    epoches = 100
-    train(lr, epoches)
-
-
+    if IF_TRAIN:  # 训练
+        lr = 1e-3
+        epoches = 10
+        train(lr, epoches)
+        plt.show()
+    else:   # 预测
+        predict()

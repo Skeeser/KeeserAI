@@ -26,14 +26,12 @@ class VAE(nn.Module):
                                      nn.Linear(256, 512),
                                      nn.Tanh())
 
-
-        self.fc21 = nn.Linear(512, 20)    # 均值
-        self.fc22 = nn.Linear(512, 20)    # 方差
-        self.fc3 = nn.Sequential(nn.Linear(20, 512),
+        self.fc21 = nn.Linear(512, 2)    # 均值
+        self.fc22 = nn.Linear(512, 2)    # 方差
+        self.fc3 = nn.Sequential(nn.Linear(2, 512),
                                      nn.ReLU(),
                                      nn.Linear(512, 784),
                                      nn.Tanh())
-
 
     def encoder(self, x):
         h1 = self.fc1(x)
