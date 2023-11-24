@@ -27,8 +27,6 @@ max_token = 5000
 MAX_LEN = 30
 # 定义自动填充内容
 PAD = 0
-# 定义要处理的文本数量
-data_size = 10000
 # 定义图片特征向量
 img_feature = 256
 
@@ -77,7 +75,7 @@ class ImageCaption(nn.Module):
         x = pack_padded_sequence(use, lengths, batch_first=True)
         hidden, _ = self.decoder(x)
         y_pred = self.linear(hidden[0])
-        y_pred = self.dropout(y_pred)
+        # y_pred = self.dropout(y_pred)
         return y_pred
 
     def infer_sl(self, features, states=None):

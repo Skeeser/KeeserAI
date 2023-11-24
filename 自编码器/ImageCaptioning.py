@@ -272,7 +272,7 @@ def train(lr, epoches):
     loss_func = nn.CrossEntropyLoss()
     # optimizer = optim.Adam(model.parameters(), lr=lr)
     optimizer = optim.Adam(model.parameters(), lr=lr, weight_decay=0.001)
-
+    scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode='min', factor=0.1, patience=2, verbose=True)
     animator = d2l.Animator(xlabel='epoch', xlim=[1, epoches],
                              legend=['train loss', 'test loss'])
 
@@ -283,9 +283,9 @@ def train(lr, epoches):
         metric = d2l.Accumulator(2)
 
         # 在训练过程中逐渐降低学习率，以便在接近训练结束时更细致地调整模型参数，使得模型更容易收敛到最优解。
-        if epoch in [epoches * 0.5, epoches * 0.75]:
-            for param_group in optimizer.param_groups:
-                param_group['lr'] *= 0.1
+        # if epoch in [epoches * 0.25, epoches * 0.5]:
+        #     for param_group in optimizer.param_groups:
+        #         param_group['lr'] *= 0.1
 
         for i, (x, y, lengths, img_names) in enumerate(train_loader):
             x = x.to(device)
@@ -302,27 +302,33 @@ def train(lr, epoches):
                 metric.add(loss_sum.item() * x.shape[0], x.shape[0])
 
             train_l = metric[0] / metric[1]
-
+            scheduler.step(train_l)
             if (i + 1) % (num_batches // 5) == 0 or i == num_batches - 1:
                 animator.add(epoch + (i + 1) / num_batches, (train_l, None))
                 print("loss=", train_l)
+        # 更新学习率
 
         test_loss = evaluate_loss_gpu(model, test_loader, loss_func, device)
+        # scheduler.step(test_loss)
+
         animator.add(epoch + 1, (None, test_loss))
         torch.cuda.empty_cache()
         print(f"epoch={epoch + 1}, train_loss={train_l}, test_loss={test_loss}")
-    torch.save(model, '../model/ImageCaption.pth')
+        # 每10轮保存一次模型
+        if (epoch + 1) % 5 == 0:
+            torch.save(model, f'../model/ImageCaption_{epoch}.pth')
+    torch.save(model, f'../model/ImageCaption.pth')
 
 
 def value_model():
-    model = torch.load('../model/ImageCaption.pth')
+    model = torch.load('../model/ImageCaption1.pth')
     model.eval()
     # 映射
     index_to_word = tokenizer.get_itos()
     # 加载模型
     with torch.no_grad():
         for num, (x, y, lengths, img_names) in enumerate(train_loader):
-            if num == 48:
+            if num == 88:
                 x = x.to(device)
                 y = y.to(device)
                 res = []
@@ -359,22 +365,22 @@ def value_model():
 
 
 def predict():
-    model = torch.load('../model/ImageCaption.pth')
+    model = torch.load('../model/ImageCaption1.pth')
     model.eval()
     # 映射
     index_to_word = tokenizer.get_itos()
     # 加载模型
     with torch.no_grad():
         for num, (x, y, lengths, img_names) in enumerate(train_loader):
-            if num == 0:
+            if num == 10:
                 x = x.to(device)
                 # y = y.to(device)
                 res = []
-                index = 6
+                index = 0
                 feature = model.encoder_func(x)
                 outputs = model.infer_sl(feature)
                 # outputs = model.infer_sl(feature)
-                for j in range(8):
+                for j in range(len(lengths)):
                     index = j
                     for i in range(len(outputs[index])):
                         res.append(index_to_word[outputs[index][i]])
@@ -393,7 +399,7 @@ if __name__ == "__main__":
 
     if IF_TRAIN:  # 训练
         lr = 1e-3
-        epoches = 10
+        epoches = 20
         train(lr, epoches)
         plt.show()
     else:   # 预测
