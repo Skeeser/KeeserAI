@@ -271,7 +271,7 @@ def train(lr, epoches):
     # model = model.to(device)
     loss_func = nn.CrossEntropyLoss()
     # optimizer = optim.Adam(model.parameters(), lr=lr)
-    optimizer = optim.Adam(model.parameters(), lr=lr, weight_decay=0.001)
+    optimizer = optim.Adam(model.parameters(), lr=lr)  # , weight_decay=0.0001
     scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode='min', factor=0.1, patience=2, verbose=True)
     animator = d2l.Animator(xlabel='epoch', xlim=[1, epoches],
                              legend=['train loss', 'test loss'])
@@ -302,26 +302,26 @@ def train(lr, epoches):
                 metric.add(loss_sum.item() * x.shape[0], x.shape[0])
 
             train_l = metric[0] / metric[1]
-            scheduler.step(train_l)
+            # scheduler.step(train_l)
             if (i + 1) % (num_batches // 5) == 0 or i == num_batches - 1:
                 animator.add(epoch + (i + 1) / num_batches, (train_l, None))
                 print("loss=", train_l)
         # 更新学习率
 
         test_loss = evaluate_loss_gpu(model, test_loader, loss_func, device)
-        # scheduler.step(test_loss)
+        scheduler.step(test_loss)
 
         animator.add(epoch + 1, (None, test_loss))
         torch.cuda.empty_cache()
         print(f"epoch={epoch + 1}, train_loss={train_l}, test_loss={test_loss}")
         # 每10轮保存一次模型
         if (epoch + 1) % 5 == 0:
-            torch.save(model, f'../model/ImageCaption_{epoch}.pth')
+            torch.save(model, f'../model/ImageCaption_{epoch + 1}.pth')
     torch.save(model, f'../model/ImageCaption.pth')
 
 
 def value_model():
-    model = torch.load('../model/ImageCaption1.pth')
+    model = torch.load('../model/ImageCaption.pth')
     model.eval()
     # 映射
     index_to_word = tokenizer.get_itos()
@@ -365,14 +365,14 @@ def value_model():
 
 
 def predict():
-    model = torch.load('../model/ImageCaption1.pth')
+    model = torch.load('../model/ImageCaption.pth')
     model.eval()
     # 映射
     index_to_word = tokenizer.get_itos()
     # 加载模型
     with torch.no_grad():
-        for num, (x, y, lengths, img_names) in enumerate(train_loader):
-            if num == 10:
+        for num, (x, y, lengths, img_names) in enumerate(test_loader):
+            if num == 12:
                 x = x.to(device)
                 # y = y.to(device)
                 res = []
@@ -383,22 +383,24 @@ def predict():
                 for j in range(len(lengths)):
                     index = j
                     for i in range(len(outputs[index])):
-                        res.append(index_to_word[outputs[index][i]])
+                        word = index_to_word[outputs[index][i]]
+                        if word != '<end>':
+                            res.append(word)
+                    res.append('<end>')
                     print(res)
                     res = []
-
-                img = load_image(img_names[index])
-                out = img[0].numpy().transpose((1, 2, 0))
-                plt.imshow(out)
-                plt.show()
+                    img = load_image(img_names[index])
+                    out = img[0].numpy().transpose((1, 2, 0))
+                    plt.imshow(out)
+                    plt.show()
                 break
 
 
 if __name__ == "__main__":
-    IF_TRAIN = True
+    IF_TRAIN = False
 
     if IF_TRAIN:  # 训练
-        lr = 1e-3
+        lr = 1e-4
         epoches = 20
         train(lr, epoches)
         plt.show()
