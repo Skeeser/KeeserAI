@@ -1,6 +1,4 @@
-from IPython import display
-from d2l import torch as d2l
-
+import matplotlib as plt
 
 class Animator:
     """在动画中绘制数据"""
@@ -11,14 +9,26 @@ class Animator:
         # 增量地绘制多条线
         if legend is None:
             legend = []
-        d2l.use_svg_display()
-        self.fig, self.axes = d2l.plt.subplots(nrows, ncols, figsize=figsize)
+        self.fig, self.axes = plt.subplots(nrows, ncols, figsize=figsize)
         if nrows * ncols == 1:
             self.axes = [self.axes, ]
         # 使用lambda函数捕获参数
-        self.config_axes = lambda: d2l.set_axes(
+        self.config_axes = lambda: self.set_axes(
             self.axes[0], xlabel, ylabel, xlim, ylim, xscale, yscale, legend)
         self.X, self.Y, self.fmts = None, None, fmts
+
+    def set_axes(self, axes, xlabel, ylabel, xlim, ylim, xscale, yscale, legend):
+        """Set the axes for matplotlib.
+        Defined in :numref:`sec_calculus`"""
+        axes.set_xlabel(xlabel)
+        axes.set_ylabel(ylabel)
+        axes.set_xscale(xscale)
+        axes.set_yscale(yscale)
+        axes.set_xlim(xlim)
+        axes.set_ylim(ylim)
+        if legend:
+            axes.legend(legend)
+        axes.grid()
 
     def add(self, x, y):
         # 向图表中添加多个数据点
@@ -39,9 +49,5 @@ class Animator:
         for x, y, fmt in zip(self.X, self.Y, self.fmts):
             self.axes[0].plot(x, y, fmt)
         self.config_axes()
-        if 'display' in globals():  # 非Notebook环境不调用display()
-            # display:ipython = globals()['display']
-            display.display(self.fig)
-            display.clear_output(wait=True)
 
 
