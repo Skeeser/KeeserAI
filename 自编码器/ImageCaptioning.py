@@ -351,12 +351,6 @@ def value_model():
                     right.append(index_to_word[predicted])
                 print(right)
 
-                # break
-                #
-                # feature = model.encoder_func(x)
-                # outputs = model.infer_sl(feature[index:index+1])
-                # for i in range(len(outputs)):
-                #     print(index_to_word[outputs[i]])
                 img = load_image(img_names[index])
                 out = img[0].numpy().transpose((1, 2, 0))
                 plt.imshow(out)
@@ -372,7 +366,7 @@ def predict():
     # 加载模型
     with torch.no_grad():
         for num, (x, y, lengths, img_names) in enumerate(test_loader):
-            if num == 12:
+            if num == 32:
                 x = x.to(device)
                 # y = y.to(device)
                 res = []

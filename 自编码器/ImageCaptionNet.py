@@ -3,13 +3,6 @@ import torch
 from torch import nn, optim
 import matplotlib.pyplot as plt
 from torchvision import datasets, transforms, models
-from torch.utils.data import Dataset, DataLoader
-import json
-from sklearn.utils import shuffle
-from PIL import Image, ImageOps
-import torchtext
-from sklearn.model_selection import train_test_split
-from d2l import torch as d2l
 from torch.nn.utils.rnn import pack_padded_sequence, pad_packed_sequence
 
 if torch.cuda.is_available():
