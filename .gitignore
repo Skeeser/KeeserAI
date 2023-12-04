@@ -1,6 +1,7 @@
 # resource
 /resource
 /model
+/reference
 
 # Editor
 .idea
