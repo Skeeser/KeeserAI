@@ -12,6 +12,7 @@ import os.path
 import random
 import numpy as np
 
+
 class yoloDataset(data.Dataset):
     image_size = 448
 
