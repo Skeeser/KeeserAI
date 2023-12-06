@@ -1,10 +1,3 @@
-"""VOC Dataset Classes
-
-Original author: Francisco Massa
-https://github.com/fmassa/vision/blob/voc_dataset/torchvision/datasets/voc.py
-
-Updated by: Ellis Brown, Max deGroot
-"""
 import os.path as osp
 import sys
 import torch
@@ -19,18 +12,17 @@ else:
     import xml.etree.ElementTree as ET
 
 VOC_CLASSES = (  # always index 0
-    'aeroplane', 'bicycle', 'bird', 'boat',
-    'bottle', 'bus', 'car', 'cat', 'chair',
-    'cow', 'diningtable', 'dog', 'horse',
-    'motorbike', 'person', 'pottedplant',
-    'sheep', 'sofa', 'train', 'tvmonitor')
+    'math')
 
-# note: if you used our download scripts, this should be right
-path_to_dir = osp.dirname(osp.abspath(__file__))
-VOC_ROOT = path_to_dir + "/VOCdevkit/"
-VOC_ROOT = "/home/k303/object-detection/dataset/VOCdevkit/"
 
-# 读取
+# 加载数据集
+
+# 定义数据集路径
+VOC_ROOT = r"D:\AllMyProject\人工智能\KeeserAI\resource\voc_test\data"
+
+
+# 导入库和定义VOC数据集的类
+# 将位置转化为比值, 还有将class转化为下标
 class VOCAnnotationTransform(object):
     """Transforms a VOC annotation into a Tensor of bbox coords and label index
     Initilized with a dictionary lookup of classnames to indexes
@@ -111,14 +103,16 @@ class VOCDetection(data.Dataset):
         self._imgpath = osp.join('%s', 'JPEGImages', '%s.jpg')
         self.ids = list()
         self.mosaic = mosaic
+
+        # 读取训练集测试集划分文件, 因为是测试, 所以暂时不用
         for (year, name) in image_sets:
-            rootpath = osp.join(self.root, 'VOC' + year)
+            # rootpath = osp.join(self.root, 'VOC' + year)
+            rootpath = self.root
             for line in open(osp.join(rootpath, 'ImageSets', 'Main', name + '.txt')):
                 self.ids.append((rootpath, line.strip()))
 
     def __getitem__(self, index):
         im, gt, h, w = self.pull_item(index)
-
         return im, gt
 
     def __len__(self):
@@ -134,7 +128,12 @@ class VOCDetection(data.Dataset):
         if self.target_transform is not None:
             target = self.target_transform(target, width, height)
 
-        # mosaic augmentation
+        """
+        数据增强
+        随机选择除了当前索引之外的三个索引，构成一个包含四个图像的列表。
+        创建一个大的空白画布 mosaic_img，并在其上随机组合这四个图像（img_lists）成为一个新的拼接图像。
+        对目标标注信息进行相应的转换，确保其与新生成的拼接图像保持一致。
+        """
         if self.mosaic and np.random.randint(2):
             ids_list_ = self.ids[:index] + self.ids[index + 1:]
             # random sample 3 indexs
@@ -265,6 +264,7 @@ class VOCDetection(data.Dataset):
         anno = ET.parse(self._annopath % img_id).getroot()
         gt = self.target_transform(anno, 1, 1)
         return img_id[1], gt
+
 
 
 if __name__ == "__main__":
