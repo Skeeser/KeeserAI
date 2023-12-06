@@ -6,7 +6,7 @@ import argparse
 import time
 import math
 import numpy as np
-
+import cv2
 import torch
 import torch.optim as optim
 import torch.backends.cudnn as cudnn
@@ -15,7 +15,7 @@ from Data import VOCDetection
 import Tools
 from Model import myYOLO
 from Utils import SSDAugmentation
-from utils.vocapi_evaluator import VOCAPIEvaluator
+# from utils.vocapi_evaluator import VOCAPIEvaluator
 
 
 # 数据预处理函数
@@ -41,8 +41,8 @@ def detection_collate(batch):
 
 
 train_cfg = {
-    'lr_epoch': (60, 90, 160),
-    'max_epoch': 160,
+    'lr_epoch': (20, 40, 80),
+    'max_epoch': 80,
     'min_dim': [416, 416]
 }
 
@@ -80,19 +80,19 @@ def train():
     # 加载数据集
     print("加载数据集......")
     # 设置数据集地址
-    data_dir = r"../resource/AI_cource"
+    data_dir = "../resource/yolo"
     num_classes = 1
     dataset = VOCDetection(root=data_dir,
                            img_size=train_size[0],
                            transform=SSDAugmentation(train_size)
                            )
 
-    evaluator = VOCAPIEvaluator(data_root=data_dir,
-                                img_size=val_size,
-                                device=device,
-                                transform=BaseTransform(val_size),
-                                labelmap=CLASSES
-                                )
+    # evaluator = VOCAPIEvaluator(data_root=data_dir,
+    #                             img_size=val_size,
+    #                             device=device,
+    #                             transform=BaseTransform(val_size),
+    #                             labelmap=CLASSES
+    #                             )
 
 
 
@@ -120,7 +120,7 @@ def train():
     if tensorboard:
         print('使用tensorboard可视化......')
         from torch.utils.tensorboard import SummaryWriter
-        c_time = time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(time.time()))
+        c_time = time.strftime('%Y-%m-%d_%H_%M_%S', time.localtime(time.time()))
         log_path = os.path.join('./log/', c_time)
         os.makedirs(log_path, exist_ok=True)
         writer = SummaryWriter(log_path)
@@ -133,7 +133,7 @@ def train():
 
     # 超参数设置
     # 学习率, 优化器
-    base_lr = 1e-3
+    base_lr = 1e-4
     tmp_lr = base_lr
     # momentum是动量（momentum）的概念，它在更新参数时考虑了之前更新的方向，
     # 有助于加速收敛并且有助于在局部最小值周围更快地搜索到全局最小值。
@@ -189,7 +189,6 @@ def train():
             #     elif epoch == args.wp_epoch and iter_i == 0:
             #         tmp_lr = base_lr
             #         set_lr(optimizer, tmp_lr)
-
             # to device
             images = images.to(device)
 
@@ -236,18 +235,18 @@ def train():
                 t0 = time.time()
 
         # evaluation
-        if (epoch + 1) % eval_epoch == 0:
-            model.trainable = False
-            model.set_grid(val_size)
-            model.eval()
-
-            # evaluate
-            evaluator.evaluate(model)
-
-            # convert to training mode.
-            model.trainable = True
-            model.set_grid(train_size)
-            model.train()
+        # if (epoch + 1) % eval_epoch == 0:
+        #     model.trainable = False
+        #     model.set_grid(val_size)
+        #     model.eval()
+        #
+        #     # evaluate
+        #     # evaluator.evaluate(model)
+        #
+        #     # convert to training mode.
+        #     model.trainable = True
+        #     model.set_grid(train_size)
+        #     model.train()
 
         # save model
         if (epoch + 1) % 10 == 0:

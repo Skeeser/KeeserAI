@@ -1,7 +1,16 @@
-import torchtext.vocab as vocab
+from numpy import random
 
-# 假设有一个文本数据迭代器 data_iter，其中每个元素是一个单词序列（如列表）
-data_iter = [['this', 'is', 'a', 'sentence'], ['another', 'sentence']]
+sample_options = (
+            # using entire original input image
+            None,
+            # sample a patch s.t. MIN jaccard w/ obj in .1,.3,.4,.7,.9
+            (0.1, None),
+            (0.3, None),
+            (0.7, None),
+            (0.9, None),
+            # randomly sample a patch
+            (None, None)
+        )
 
-# 使用 build_vocab_from_iterator 构建词汇表
-vocab.build_vocab_from_iterator(data_iter)
+mode = random.choice(range(len(sample_options)))
+print(sample_options[mode])

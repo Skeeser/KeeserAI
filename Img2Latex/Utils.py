@@ -232,18 +232,20 @@ class RandomSampleCrop(object):
             (0.7, None),
             (0.9, None),
             # randomly sample a patch
-            (None, None),
+            (None, None)
         )
 
     def __call__(self, image, boxes=None, labels=None):
         height, width, _ = image.shape
         while True:
             # randomly choose a mode
-            mode = random.choice(self.sample_options)
-            if mode is None:
+            mode = random.choice(range(len(self.sample_options)))
+
+            if self.sample_options[mode] is None:
                 return image, boxes, labels
 
-            min_iou, max_iou = mode
+            min_iou, max_iou = self.sample_options[mode]
+
             if min_iou is None:
                 min_iou = float('-inf')
             if max_iou is None:
