@@ -26,6 +26,7 @@ class myYOLO(nn.Module):
         self.backbone = resnet18(pretrained=True)
 
         # neck
+        # SPP作用是增加感受野
         self.SPP = nn.Sequential(
             Conv(512, 256, k=1),
             SPP(),
@@ -69,7 +70,7 @@ class myYOLO(nn.Module):
 
         return output
 
-    # 非极大抑制（NMS）
+    # 非极大抑制（NMS）用于减少重叠边界框并保留最相关的边界框
     def nms(self, dets, scores):
         x1 = dets[:, 0]  # xmin
         y1 = dets[:, 1]  # ymin
@@ -77,30 +78,31 @@ class myYOLO(nn.Module):
         y2 = dets[:, 3]  # ymax
 
         areas = (x2 - x1) * (y2 - y1)  # the size of bbox
-        order = scores.argsort()[::-1]  # sort bounding boxes by decreasing order
+        # order = scores.argsort()[::-1]  # sort bounding boxes by decreasing order
+        order = scores.argsort().flip(dims=(0,))  # 排序
 
         keep = []  # store the final bounding boxes
-        while order.size > 0:
+        while len(order) > 0:
             i = order[0]  # the index of the bbox with highest confidence
             keep.append(i)  # save it to keep
-            xx1 = np.maximum(x1[i], x1[order[1:]])
-            yy1 = np.maximum(y1[i], y1[order[1:]])
-            xx2 = np.minimum(x2[i], x2[order[1:]])
-            yy2 = np.minimum(y2[i], y2[order[1:]])
+            xx1 = torch.maximum(x1[i], x1[order[1:]])
+            yy1 = torch.maximum(y1[i], y1[order[1:]])
+            xx2 = torch.minimum(x2[i], x2[order[1:]])
+            yy2 = torch.minimum(y2[i], y2[order[1:]])
 
-            w = np.maximum(1e-28, xx2 - xx1)
-            h = np.maximum(1e-28, yy2 - yy1)
+            w = torch.maximum(torch.tensor(1e-28), xx2 - xx1)
+            h = torch.maximum(torch.tensor(1e-28), yy2 - yy1)
             inter = w * h
 
             # Cross Area / (bbox + particular area - Cross Area)
             ovr = inter / (areas[i] + areas[order[1:]] - inter)
             # reserve all the boundingbox whose ovr less than thresh
-            inds = np.where(ovr <= self.nms_thresh)[0]
+            inds = torch.where(ovr <= self.nms_thresh)[0]
             order = order[inds + 1]
 
         return keep
 
-    def postprocess(self, all_local, all_conf, exchange=True, im_shape=None):
+    def postprocess(self, all_local, all_conf):
         """
         bbox_pred: (HxW, 4), bsize = 1
         prob_pred: (HxW, num_classes), bsize = 1
@@ -108,20 +110,26 @@ class myYOLO(nn.Module):
         bbox_pred = all_local
         prob_pred = all_conf
 
-        cls_inds = np.argmax(prob_pred, axis=1)
-        prob_pred = prob_pred[(np.arange(prob_pred.shape[0]), cls_inds)]
-        scores = prob_pred.copy()
+        # cls_inds = np.argmax(prob_pred, axis=1)
+        # 类别预测张量
+        cls_inds = torch.argmax(prob_pred, dim=0)
+        # prob_pred = prob_pred[(np.arange(prob_pred.shape[0]), cls_inds)]
+        # 概率预测张量
+        # prob_pred = prob_pred[(torch.arange(prob_pred.shape[0]), cls_inds)]
+        prob_pred = torch.gather(prob_pred, 1, cls_inds)
+
+        scores = prob_pred.detach()
 
         # threshold
-        keep = np.where(scores >= self.conf_thresh)
+        keep = torch.where(scores >= self.conf_thresh)
         bbox_pred = bbox_pred[keep]
         scores = scores[keep]
         cls_inds = cls_inds[keep]
 
         # NMS
-        keep = np.zeros(len(bbox_pred), dtype=int)
+        keep = torch.zeros(len(bbox_pred), dtype=torch.int)
         for i in range(self.num_classes):
-            inds = np.where(cls_inds == i)[0]
+            inds = torch.where(cls_inds == i)[0]
             if len(inds) == 0:
                 continue
             c_bboxes = bbox_pred[inds]
@@ -129,14 +137,10 @@ class myYOLO(nn.Module):
             c_keep = self.nms(c_bboxes, c_scores)
             keep[inds[c_keep]] = 1
 
-        keep = np.where(keep > 0)
+        keep = torch.where(keep > 0)
         bbox_pred = bbox_pred[keep]
         scores = scores[keep]
         cls_inds = cls_inds[keep]
-
-        if im_shape != None:
-            # clip
-            bbox_pred = self.clip_boxes(bbox_pred, im_shape)
 
         return bbox_pred, scores, cls_inds
 
@@ -170,11 +174,12 @@ class myYOLO(nn.Module):
                 all_bbox = torch.clamp((self.decode_boxes(txtytwth_pred) / self.scale_torch)[0], 0., 1.)
                 all_class = (torch.softmax(cls_pred[0, :, :], 1) * all_conf)
 
-                # separate box pred and class conf
-                all_conf = all_conf.to('cpu').numpy()
-                all_class = all_class.to('cpu').numpy()
-                all_bbox = all_bbox.to('cpu').numpy()
+                # 转换为numpy格式
+                # all_conf = all_conf.to('cpu').numpy()
+                # all_class = all_class.to('cpu').numpy()
+                # all_bbox = all_bbox.to('cpu').numpy()
 
+                # separate box pred and class conf
                 bboxes, scores, cls_inds = self.postprocess(all_bbox, all_class)
 
                 return bboxes, scores, cls_inds

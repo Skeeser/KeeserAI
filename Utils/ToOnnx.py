@@ -1,7 +1,6 @@
 import numpy as np
 import torch
-from MLP.MLP import MLP
-from LSTM.LSTM import LstmRNN
+from Img2Latex.Model import myYOLO
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -24,21 +23,14 @@ def convert():
     )
 
 
-SET_MODELS = ["MLP", "LSTM"] # 需要转换的模型们
+SET_MODELS = ["MyYolo"] # 需要转换的模型们
 
-if "MLP" in SET_MODELS:
-    torch_model = MLP()
-    torch_model.load_state_dict(torch.load("MLP/MLP.pth")) #加载.pth文件
+
+if "MyYolo" in SET_MODELS:
+    torch_model = myYOLO(device, input_size=416, num_classes=1, trainable=False)
+    torch_model.load_state_dict(torch.load("../Img2Latex/out/model_80.pth")) #加载.pth文件
     torch_model.to(device)
-    export_onnx_file = "MLP/MLP.onnx"
+    export_onnx_file = "../Img2Latex/out/myYolo.onnx"
     batch_size = 1
-    input_shape = (3,)  # 模型的输入，根据训练时数据集的输入
-    convert()
-if "LSTM" in SET_MODELS:
-    torch_model = LstmRNN()
-    torch_model.load_state_dict(torch.load("LSTM/LSTM.pth")) #加载.pth文件
-    torch_model.to(device)
-    export_onnx_file = "LSTM/LSTM.onnx"
-    batch_size = 1
-    input_shape = (1, 1, 3,)  # 模型的输入，根据训练时数据集的输入
+    input_shape = (1, 3, 416, 416)  # 模型的输入，根据训练时数据集的输入
     convert()

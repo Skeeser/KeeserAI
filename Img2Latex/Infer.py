@@ -97,6 +97,10 @@ def infer(net, device, root_path, transform, thresh, class_colors=None, class_na
         # forward
         bboxes, scores, cls_inds = net(x)
         print("detection time used ", time.time() - t0, "s")
+        # 转为numpy形式
+        # bboxes = bboxes.cpu().numpy()
+        # scores = bboxes.cpu().numpy()
+        # cls_inds = cls_inds.cpu().numpy()
 
         # scale each detection back up to the image
         scale = np.array([[w, h, w, h]])
