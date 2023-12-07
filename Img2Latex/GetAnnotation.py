@@ -9,6 +9,9 @@ Target_ids = "../resource/yolo/yolo_ids.txt"
 path_all_num = 0
 cur_path_num = 0
 
+# 经过ValAnnotation清洗的不合格数据
+noValue_list = (101, 193, 237, 347, 367, 377)
+
 with open(Target_ids, 'w') as ids_file:
     # 遍历文件夹
     # 使用 os.walk() 方法遍历文件夹
@@ -29,17 +32,18 @@ with open(Target_ids, 'w') as ids_file:
 
             if match:
                 extracted_number = match.group(1)
-                cur_path_num += 1
-                # print(extracted_number)
-                if int(extracted_number) % 2 == 1:
-                    # 奇数
-                    print(extracted_number)
-                    for file in files:
-                        if file.split('.')[1] == "xml":
-                            file_path = os.path.join(root, file)
-                            ids_file.write(file.split('.')[0] + '\n')
-                            # print(file_path)
-                            shutil.copy(file_path, Target_Path)
+                if int(extracted_number) not in noValue_list:
+                    cur_path_num += 1
+                    # print(extracted_number)
+                    if int(extracted_number) % 2 == 1:
+                        # 奇数
+                        print(extracted_number)
+                        for file in files:
+                            if file.split('.')[1] == "xml":
+                                file_path = os.path.join(root, file)
+                                ids_file.write(file.split('.')[0] + '\n')
+                                # print(file_path)
+                                shutil.copy(file_path, Target_Path)
 
 
             else:

@@ -81,7 +81,6 @@ class VOCDetection(data.Dataset):
         for line in open(osp.join(self.root, 'yolo_ids.txt')):
             self.ids.append((self.root, line.strip()))
 
-
     def __getitem__(self, index):
         im, gt, h, w = self.pull_item(index)
         return im, gt

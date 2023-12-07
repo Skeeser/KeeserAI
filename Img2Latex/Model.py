@@ -26,6 +26,7 @@ class myYOLO(nn.Module):
         self.backbone = resnet18(pretrained=True)
 
         # neck
+        # SPP作用是增加感受野
         self.SPP = nn.Sequential(
             Conv(512, 256, k=1),
             SPP(),
@@ -69,7 +70,7 @@ class myYOLO(nn.Module):
 
         return output
 
-    # 非极大抑制（NMS）
+    # 非极大抑制（NMS）用于减少重叠边界框并保留最相关的边界框
     def nms(self, dets, scores):
         x1 = dets[:, 0]  # xmin
         y1 = dets[:, 1]  # ymin
@@ -119,7 +120,7 @@ class myYOLO(nn.Module):
         cls_inds = cls_inds[keep]
 
         # NMS
-        keep = np.zeros(len(bbox_pred), dtype=np.int)
+        keep = np.zeros(len(bbox_pred), dtype=int)
         for i in range(self.num_classes):
             inds = np.where(cls_inds == i)[0]
             if len(inds) == 0:

@@ -115,7 +115,7 @@ def train():
     model = yolo_net
     model.to(device).train()
 
-    # 是否使用tfboard记录和可视化训练过程中的数据
+    # 是否使用tfboard记录和可视化训练过程中的数据, 查看命令tensorboard --logdir=2023-12-06_19_32_04
     tensorboard = True
     if tensorboard:
         print('使用tensorboard可视化......')
@@ -126,7 +126,7 @@ def train():
         writer = SummaryWriter(log_path)
 
     # 是否要继续之前的模型, 要的话改为之前训练的模型地址
-    resume = None
+    resume = "out/model_0/model_50.pth"
     if resume is not None:
         print('继续训练....模型地址为: %s' % (resume))
         model.load_state_dict(torch.load(resume, map_location=device))

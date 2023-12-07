@@ -106,14 +106,14 @@ def loss(pred_conf, pred_cls, pred_txtytwth, label):
     gt_txtytwth = label[:, :, 2:-1].float()
     gt_box_scale_weight = label[:, :, -1]
 
-    # objectness loss
+    # objectness loss 坐标预测
     pos_loss, neg_loss = conf_loss_function(pred_conf, gt_obj)
     conf_loss = obj * pos_loss + noobj * neg_loss
     
     # class loss
     cls_loss = torch.mean(torch.sum(cls_loss_function(pred_cls, gt_cls) * gt_obj, 1))
     
-    # box loss
+    # box loss  box置信度与猜测
     txty_loss = torch.mean(torch.sum(torch.sum(txty_loss_function(pred_txty, gt_txtytwth[:, :, :2]), 2) * gt_box_scale_weight * gt_obj, 1))
     twth_loss = torch.mean(torch.sum(torch.sum(twth_loss_function(pred_twth, gt_txtytwth[:, :, 2:]), 2) * gt_box_scale_weight * gt_obj, 1))
 
