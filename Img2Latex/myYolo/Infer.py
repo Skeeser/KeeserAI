@@ -1,14 +1,10 @@
 import os
-import argparse
 import random
-
 import torch
 import torch.nn as nn
 import torch.backends.cudnn as cudnn
-from Data import VOCDetection
 import numpy as np
 import cv2
-import Tools
 import time
 from Model import myYOLO
 
@@ -131,7 +127,7 @@ if __name__ == '__main__':
 
     # 加载数据集
     print("加载数据集......")
-    data_dir = "../resource/yolo"
+    data_dir = "../../resource/yolo"
     num_classes = 1
     # dataset = VOCDetection(root=data_dir, img_size=input_size[0], transform=None)
 
