@@ -101,7 +101,7 @@ def evaluate(net, dataset, device, out_root_path):
 
 def train():
     # 设置保存地址
-    path_to_save = "./out"
+    path_to_save = "/root/autodl-tmp/out"
     os.makedirs(path_to_save, exist_ok=True)
 
     # 不使用高分辨率的骨干网络
@@ -147,6 +147,15 @@ def train():
     num_workers = 8
     dataloader = torch.utils.data.DataLoader(
         dataset,
+        batch_size=batch_size,
+        shuffle=True,
+        collate_fn=detection_collate,
+        num_workers=num_workers,
+        pin_memory=True
+    )
+
+    evaldataloader = torch.utils.data.DataLoader(
+        evaluator,
         batch_size=batch_size,
         shuffle=True,
         collate_fn=detection_collate,
@@ -286,11 +295,11 @@ def train():
             model.eval()
             with torch.no_grad():
                 # evaluate
-                for iter_i, (images, targets) in enumerate(evaluator):
+                for iter_i, (images, targets) in enumerate(evaldataloader):
                     images = images.to(device)
                     # make train label
                     targets = [label.tolist() for label in targets]
-                    targets = Tools.gt_creator(input_size=train_size, stride=yolo_net.stride, label_lists=targets)
+                    targets = Tools.gt_creator(input_size=val_size, stride=yolo_net.stride, label_lists=targets)
                     targets = torch.tensor(targets).float().to(device)
 
                     # forward and loss
