@@ -59,7 +59,7 @@ def evaluate(net, dataset, device, out_root_path):
     #    all_boxes[cls][image] = N x 5 array of detections in
     #    (x1, y1, x2, y2, score)
     all_boxes = [[[] for _ in range(num_images)]
-                      for _ in range(1)]
+                 for _ in range(1)]
 
     # timers
     if not os.path.exists(out_root_path):
@@ -125,7 +125,6 @@ def train():
         train_size = [416, 416]
         val_size = [416, 416]
 
-
     # 加载数据集
     print("加载数据集......")
     # 设置数据集地址
@@ -136,14 +135,11 @@ def train():
                            transform=SSDAugmentation(train_size)
                            )
 
-    # evaluator = VOCAPIEvaluator(data_root=data_dir,
-    #                             img_size=val_size,
-    #                             device=device,
-    #                             transform=BaseTransform(val_size),
-    #                             labelmap=CLASSES
-    #                             )
-
-
+    evaluator = VOCDetection(root=data_dir,
+                             img_size=train_size[0],
+                             transform=SSDAugmentation(train_size),
+                             eval=True
+                             )
 
     # dataloader
     batch_size = 64
@@ -214,7 +210,7 @@ def train():
         if cos and epoch > 20 and epoch <= max_epoch - 20:
             # use cos lr
             tmp_lr = 0.00001 + 0.5 * (base_lr - 0.00001) * (
-                        1 + math.cos(math.pi * (epoch - 20) * 1. / (max_epoch - 20)))
+                    1 + math.cos(math.pi * (epoch - 20) * 1. / (max_epoch - 20)))
             set_lr(optimizer, tmp_lr)
 
         elif cos and epoch > max_epoch - 20:
@@ -269,13 +265,13 @@ def train():
             if iter_i % 10 == 0:
                 if tensorboard:
                     # viz loss
-                    writer.add_scalar('object loss', conf_loss.item(), iter_i + epoch * epoch_size)
-                    writer.add_scalar('class loss', cls_loss.item(), iter_i + epoch * epoch_size)
-                    writer.add_scalar('local loss', txtytwth_loss.item(), iter_i + epoch * epoch_size)
+                    writer.add_scalars('object loss/train', conf_loss.item(), iter_i + epoch * epoch_size)
+                    writer.add_scalars('class loss/train', cls_loss.item(), iter_i + epoch * epoch_size)
+                    writer.add_scalars('local loss/train', txtytwth_loss.item(), iter_i + epoch * epoch_size)
 
                 t1 = time.time()
                 print('[Epoch %d/%d][Iter %d/%d][lr %.6f]'
-                      '[Loss: obj %.2f || cls %.2f || bbox %.2f || total %.2f || size %d || time: %.2f]'
+                      '[Train Loss: obj %.2f || cls %.2f || bbox %.2f || total %.2f || size %d || time: %.2f]'
                       % (epoch + 1, max_epoch, iter_i, epoch_size, tmp_lr,
                          conf_loss.item(), cls_loss.item(), txtytwth_loss.item(), total_loss.item(), train_size[0],
                          t1 - t0),
@@ -289,7 +285,33 @@ def train():
             model.eval()
             with torch.no_grad():
                 # evaluate
-                model
+                for iter_i, (images, targets) in enumerate(evaluator):
+                    images = images.to(device)
+                    # make train label
+                    targets = [label.tolist() for label in targets]
+                    targets = Tools.gt_creator(input_size=train_size, stride=yolo_net.stride, label_lists=targets)
+                    targets = torch.tensor(targets).float().to(device)
+
+                    # forward and loss
+                    conf_loss, cls_loss, txtytwth_loss, total_loss = model(images, target=targets)
+                    # display
+                    if iter_i % 10 == 0:
+                        if tensorboard:
+                            # viz loss
+                            writer.add_scalars('object loss/eval', conf_loss.item(), iter_i + epoch * epoch_size)
+                            writer.add_scalars('class loss/eval', cls_loss.item(), iter_i + epoch * epoch_size)
+                            writer.add_scalars('local loss/eval', txtytwth_loss.item(), iter_i + epoch * epoch_size)
+
+                        t1 = time.time()
+                        print('[Epoch %d/%d][Iter %d/%d][lr %.6f]'
+                              '[Eval Loss: obj %.2f || cls %.2f || bbox %.2f || total %.2f || size %d || time: %.2f]'
+                              % (epoch + 1, max_epoch, iter_i, epoch_size, tmp_lr,
+                                 conf_loss.item(), cls_loss.item(), txtytwth_loss.item(), total_loss.item(),
+                                 train_size[0],
+                                 t1 - t0),
+                              flush=True)
+
+                        t0 = time.time()
 
             # convert to training mode.
             model.set_grid(train_size)
