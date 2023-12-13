@@ -128,7 +128,7 @@ def train():
     # 加载数据集
     print("加载数据集......")
     # 设置数据集地址
-    data_dir = "../resource/yolo"
+    data_dir = "/root/autodl-tmp/resource"
     num_classes = 1
     dataset = VOCDetection(root=data_dir,
                            img_size=train_size[0],
@@ -171,7 +171,8 @@ def train():
         writer = SummaryWriter(log_path)
 
     # 是否要继续之前的模型, 要的话改为之前训练的模型地址
-    resume = "out/model_0/model_50.pth"
+    # resume = "out/model_0/model_50.pth"
+    resume = None
     if resume is not None:
         print('继续训练....模型地址为: %s' % (resume))
         model.load_state_dict(torch.load(resume, map_location=device))
@@ -265,10 +266,10 @@ def train():
             if iter_i % 10 == 0:
                 if tensorboard:
                     # viz loss
-                    writer.add_scalars('object loss/train', conf_loss.item(), iter_i + epoch * epoch_size)
-                    writer.add_scalars('class loss/train', cls_loss.item(), iter_i + epoch * epoch_size)
-                    writer.add_scalars('local loss/train', txtytwth_loss.item(), iter_i + epoch * epoch_size)
-
+                    writer.add_scalar('object loss/train', conf_loss.item(), iter_i + epoch * epoch_size)
+                    writer.add_scalar('class loss/train', cls_loss.item(), iter_i + epoch * epoch_size)
+                    writer.add_scalar('local loss/train', txtytwth_loss.item(), iter_i + epoch * epoch_size)
+                    
                 t1 = time.time()
                 print('[Epoch %d/%d][Iter %d/%d][lr %.6f]'
                       '[Train Loss: obj %.2f || cls %.2f || bbox %.2f || total %.2f || size %d || time: %.2f]'
@@ -298,9 +299,9 @@ def train():
                     if iter_i % 10 == 0:
                         if tensorboard:
                             # viz loss
-                            writer.add_scalars('object loss/eval', conf_loss.item(), iter_i + epoch * epoch_size)
-                            writer.add_scalars('class loss/eval', cls_loss.item(), iter_i + epoch * epoch_size)
-                            writer.add_scalars('local loss/eval', txtytwth_loss.item(), iter_i + epoch * epoch_size)
+                            writer.add_scalar('object loss/eval', conf_loss.item(), iter_i + epoch * epoch_size)
+                            writer.add_scalar('class loss/eval', cls_loss.item(), iter_i + epoch * epoch_size)
+                            writer.add_scalar('local loss/eval', txtytwth_loss.item(), iter_i + epoch * epoch_size)
 
                         t1 = time.time()
                         print('[Epoch %d/%d][Iter %d/%d][lr %.6f]'
