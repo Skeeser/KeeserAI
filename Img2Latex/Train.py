@@ -41,13 +41,15 @@ def detection_collate(batch):
 
 
 train_cfg = {
-    'lr_epoch': (20, 40, 80),
-    'max_epoch': 80,
+    'lr_epoch': (50, 100, 200),
+    'max_epoch': 200,
     'min_dim': [416, 416]
 }
 
 CLASSES = (  # always index 0
     'math')
+
+
 
 
 def train():
@@ -97,7 +99,7 @@ def train():
 
 
     # dataloader
-    batch_size = 16
+    batch_size = 64
     # 用于数据加载的子进程数量
     num_workers = 8
     dataloader = torch.utils.data.DataLoader(
@@ -133,7 +135,7 @@ def train():
 
     # 超参数设置
     # 学习率, 优化器
-    base_lr = 1e-4
+    base_lr = 1e-3
     tmp_lr = base_lr
     # momentum是动量（momentum）的概念，它在更新参数时考虑了之前更新的方向，
     # 有助于加速收敛并且有助于在局部最小值周围更快地搜索到全局最小值。
@@ -249,7 +251,7 @@ def train():
         #     model.train()
 
         # save model
-        if (epoch + 1) % 10 == 0:
+        if (epoch + 1) % 20 == 0:
             print('Saving state, epoch:', epoch + 1)
             torch.save(model.state_dict(), os.path.join(path_to_save,
                                                         'model_' + repr(epoch + 1) + '.pth')
