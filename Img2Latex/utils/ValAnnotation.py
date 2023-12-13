@@ -12,9 +12,9 @@ else:
 #
 
 # 此文件数据评估
-Annotation_Path = "../resource/yolo/annotations/"
-Target_Path = "../resource/yolo/tricked_annotations"
-Pic_Path = "../resource/yolo/PngImages"
+Annotation_Path = "../../resource/yolo/annotations/"
+Target_Path = "../../resource/yolo/tricked_annotations"
+Pic_Path = "../../resource/yolo/PngImages"
 Target_ids = "../resource/yolo/val_annotation_ids.txt"
 path_all_num = 0
 cur_path_num = 0

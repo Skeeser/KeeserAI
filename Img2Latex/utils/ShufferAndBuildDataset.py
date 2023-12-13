@@ -1,7 +1,7 @@
 import random
 import os
 
-ROOT_PATH = r"../resource/yolo/"
+ROOT_PATH = r"../../resource/yolo/"
 
 # 读取文件中的 ID 列表
 with open(ROOT_PATH + 'yolo_ids.txt', 'r') as file:

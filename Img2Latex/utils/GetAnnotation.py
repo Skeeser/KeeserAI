@@ -3,8 +3,8 @@ import re
 import shutil
 
 # 此文件数据预处理
-Annotation_Path = "../resource/yolo/annotations/"
-Target_Path = "../resource/yolo/tricked_annotations"
+Annotation_Path = "../../resource/yolo/annotations/"
+Target_Path = "../../resource/yolo/tricked_annotations"
 Target_ids = "../resource/yolo/yolo_ids.txt"
 path_all_num = 0
 cur_path_num = 0

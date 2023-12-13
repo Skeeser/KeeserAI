@@ -30,7 +30,7 @@ SET_MODELS = ["MyYolo"]  # 需要转换的模型们
 
 if "MyYolo" in SET_MODELS:
     torch_model = myYOLO(device, input_size=[416, 416], num_classes=1, trainable=False)
-    torch_model.load_state_dict(torch.load("../Img2Latex/out/model_80.pth"))  # 加载.pth文件
+    torch_model.load_state_dict(torch.load("../out/model_80.pth"))  # 加载.pth文件
     torch_model.to(device).eval()
     export_onnx_file = "../Img2Latex/out/myYolo.onnx"
     batch_size = 1
