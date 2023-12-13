@@ -16,6 +16,8 @@ import Tools
 from Model import myYOLO
 from Utils import SSDAugmentation
 # from utils.vocapi_evaluator import VOCAPIEvaluator
+from torch.autograd import Variable
+import pickle
 
 
 # 数据预处理函数
@@ -50,6 +52,51 @@ CLASSES = (  # always index 0
     'math')
 
 
+def evaluate(net, dataset, device, out_root_path):
+    net.eval()
+    num_images = len(dataset)
+    # all detections are collected into:
+    #    all_boxes[cls][image] = N x 5 array of detections in
+    #    (x1, y1, x2, y2, score)
+    all_boxes = [[[] for _ in range(num_images)]
+                      for _ in range(1)]
+
+    # timers
+    if not os.path.exists(out_root_path):
+        os.makedirs(out_root_path)
+    det_file = os.path.join(out_root_path, 'detections.pkl')
+
+    for i in range(num_images):
+        im, gt, h, w = dataset.pull_item(i)
+
+        x = Variable(im.unsqueeze(0)).to(device)
+        t0 = time.time()
+        # forward
+        bboxes, scores, cls_inds = net(x)
+        detect_time = time.time() - t0
+        scale = np.array([[w, h, w, h]])
+        bboxes *= scale
+
+        for j in range(1):
+            inds = np.where(cls_inds == j)[0]
+            if len(inds) == 0:
+                all_boxes[j][i] = np.empty([0, 5], dtype=np.float32)
+                continue
+            c_bboxes = bboxes[inds]
+            c_scores = scores[inds]
+            c_dets = np.hstack((c_bboxes,
+                                c_scores[:, np.newaxis])).astype(np.float32,
+                                                                 copy=False)
+            all_boxes[j][i] = c_dets
+
+        if i % 500 == 0:
+            print('im_detect: {:d}/{:d} {:.3f}s'.format(i + 1, num_images, detect_time))
+
+    with open(det_file, 'wb') as f:
+        pickle.dump(all_boxes, f, pickle.HIGHEST_PROTOCOL)
+
+    print('Evaluating detections')
+    self.evaluate_detections(all_boxes)
 
 
 def train():
@@ -237,21 +284,19 @@ def train():
                 t0 = time.time()
 
         # evaluation
-        # if (epoch + 1) % eval_epoch == 0:
-        #     model.trainable = False
-        #     model.set_grid(val_size)
-        #     model.eval()
-        #
-        #     # evaluate
-        #     # evaluator.evaluate(model)
-        #
-        #     # convert to training mode.
-        #     model.trainable = True
-        #     model.set_grid(train_size)
-        #     model.train()
+        if (epoch + 1) % eval_epoch == 0:
+            model.set_grid(val_size)
+            model.eval()
+            with torch.no_grad():
+                # evaluate
+                model
+
+            # convert to training mode.
+            model.set_grid(train_size)
+            model.train()
 
         # save model
-        if (epoch + 1) % 20 == 0:
+        if (epoch + 1) % 10 == 0:
             print('Saving state, epoch:', epoch + 1)
             torch.save(model.state_dict(), os.path.join(path_to_save,
                                                         'model_' + repr(epoch + 1) + '.pth')

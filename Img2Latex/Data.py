@@ -65,7 +65,7 @@ class VOCAnnotationTransform(object):
 class VOCDetection(data.Dataset):
     def __init__(self, root, img_size,
                  transform=None, target_transform=VOCAnnotationTransform(),
-                 dataset_name='Img2Latex', mosaic=False):
+                 dataset_name='Img2Latex', mosaic=False, eval=False):
         self.root = root
         self.img_size = img_size
         self.transform = transform
@@ -78,8 +78,12 @@ class VOCDetection(data.Dataset):
 
         # 读取训练集测试集划分文件
         # rootpath = self.root
-        for line in open(osp.join(self.root, 'yolo_ids.txt')):
-            self.ids.append((self.root, line.strip()))
+        if not eval:
+            for line in open(osp.join(self.root, 'train_ids.txt')):
+                self.ids.append((self.root, line.strip()))
+        else:
+            for line in open(osp.join(self.root, 'validation_ids.txt')):
+                self.ids.append((self.root, line.strip()))
 
     def __getitem__(self, index):
         im, gt, h, w = self.pull_item(index)

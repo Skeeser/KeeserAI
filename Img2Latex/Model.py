@@ -36,6 +36,7 @@ class myYOLO(nn.Module):
 
         self.pred = nn.Conv2d(512, 1 + self.num_classes + 4, 1)
 
+    # 创建网格
     def create_grid(self, input_size):
         w, h = input_size[1], input_size[0]
         ws, hs = w // self.stride, h // self.stride
@@ -45,6 +46,7 @@ class myYOLO(nn.Module):
 
         return grid_xy
 
+    # 设置网格
     def set_grid(self, input_size):
         self.input_size = input_size
         self.grid_cell = self.create_grid(input_size)
