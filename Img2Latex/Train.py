@@ -122,8 +122,8 @@ def train():
         train_size = [640, 640]
         val_size = [416, 416]
     else:
-        train_size = [416, 416]
-        val_size = [416, 416]
+        train_size = [640, 640]
+        val_size = [640, 640]
 
     # 加载数据集
     print("加载数据集......")
@@ -276,7 +276,7 @@ def train():
                 if tensorboard:
                     # viz loss
                     writer.add_scalar('object loss/train', conf_loss.item(), iter_i + epoch * epoch_size)
-                    writer.add_scalar('class loss/train', cls_loss.item(), iter_i + epoch * epoch_size)
+                    writer.add_scalar('total loss/train', total_loss.item(), iter_i + epoch * epoch_size)
                     writer.add_scalar('local loss/train', txtytwth_loss.item(), iter_i + epoch * epoch_size)
                     
                 t1 = time.time()
@@ -309,7 +309,7 @@ def train():
                         if tensorboard:
                             # viz loss
                             writer.add_scalar('object loss/eval', conf_loss.item(), iter_i + epoch * epoch_size)
-                            writer.add_scalar('class loss/eval', cls_loss.item(), iter_i + epoch * epoch_size)
+                            writer.add_scalar('total loss/eval', total_loss.item(), iter_i + epoch * epoch_size)
                             writer.add_scalar('local loss/eval', txtytwth_loss.item(), iter_i + epoch * epoch_size)
 
                         t1 = time.time()
