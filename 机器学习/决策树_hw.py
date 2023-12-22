@@ -1,3 +1,5 @@
+import math
+
 import numpy as np
 from sklearn import model_selection  # 仅仅用来划分数据集
 import matplotlib.pyplot as plt
@@ -20,15 +22,11 @@ data = np.loadtxt(data_path,               # 数据文件路径
                   dtype=float,              # 数据类型
                   delimiter=',',            # 数据分隔符
                   converters={4:iris_type})  # 将第5列使用函数iris_type进行转换
-# print(data)                               #data为二维数组，data.shape=(150, 5)
-# print(data.shape)
 # 数据分割
 x, y = np.split(data,                      # 要切分的数组
                 (4,),                      # 沿轴切分的位置，第5列开始往后为y
                 axis=1)                    # 代表纵向分割，按列分割
 x = x[:, 0:4]                              # 在X中我们取前两列作为特征，为了后面的可视化。x[:,0:4]代表第一维(行)全取，第二维(列)取0~2
-# print(x)
-# (105, 2) (45, 2) (105, 1) (45, 1)
 x_train, x_test, y_train, y_test = model_selection.train_test_split(x,              # 所要划分的样本特征集
                                                                y,               # 所要划分的样本结果
                                                                random_state=1,  # 随机数种子
@@ -37,6 +35,7 @@ x_train, x_test, y_train, y_test = model_selection.train_test_split(x,          
 # 按列拼接两个数组
 train_data = np.concatenate([x_train, y_train], axis=1)
 test_data = np.concatenate([x_test, y_test], axis=1)
+
 
 # 计算经验熵
 def calcShannonEnt(dataSet):
@@ -50,13 +49,13 @@ def calcShannonEnt(dataSet):
         if current_label not in label_counts:  # 提取label信息
             label_counts[current_label] = 0  # 如果label未在dict中则加入
         label_counts[current_label] += 1  # label计数
-
     shannon_ent = 0  # 经验熵
     # 计算经验熵
     for key in label_counts:
         prob = float(label_counts[key]) / numEntries
         shannon_ent -= prob * log(prob, 2)
     return shannon_ent
+
 
 # 划分子集
 def splitDataSet(data_set, axis_t, value):
@@ -188,13 +187,23 @@ def classify(input_tree, feat_labels, test_vec):
     # 下一个字典
     second_dict = input_tree[first_str]
     feat_index = feat_labels.index(first_str)
-    class_label = -1
+    # class_label = -1
+    res_diff = []
+    second_dict_keys = []
     for key in second_dict.keys():
-        if test_vec[feat_index] == key:
-            if type(second_dict[key]).__name__ == 'dict':
-                class_label = classify(second_dict[key], feat_labels, test_vec)
-            else:
-                class_label = second_dict[key]
+        second_dict_keys.append(key)
+        res_diff.append(math.pow((test_vec[feat_index] - key), 2))
+
+    # 获取误差最小的index
+    min_tmp = min(res_diff)
+    index = res_diff.index(min_tmp)
+
+    new_key = second_dict_keys[index]
+    if type(second_dict[new_key]).__name__ == 'dict':
+        class_label = classify(second_dict[new_key], feat_labels, test_vec)
+    else:
+        class_label = second_dict[new_key]
+
     return class_label
 
 
