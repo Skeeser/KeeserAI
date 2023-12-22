@@ -68,26 +68,18 @@ data = np.loadtxt(data_path,               # 数据文件路径
                   dtype=float,              # 数据类型
                   delimiter=',',            # 数据分隔符
                   converters={4:iris_type})  # 将第5列使用函数iris_type进行转换
-# print(data)                               #data为二维数组，data.shape=(150, 5)
-# print(data.shape)
 # 数据分割
 x, y = np.split(data,                      # 要切分的数组
                 (4,),                      # 沿轴切分的位置，第5列开始往后为y
                 axis=1)                    # 代表纵向分割，按列分割
 
-# 这个不对吧
-x = x[:, 0:2]                              # 在X中我们取前两列作为特征，为了后面的可视化。x[:,0:4]代表第一维(行)全取，第二维(列)取0~2
 # print(x)
-# (105, 2) (45, 2) (105, 1) (45, 1)
 x_train, x_test, y_train, y_test = model_selection.train_test_split(x,              # 所要划分的样本特征集
                                                                y,               # 所要划分的样本结果
                                                                random_state=1,  # 随机数种子
                                                                test_size=0.2)   # 测试样本占比
-
 # 按列拼接两个数组
 train_data = np.concatenate([x_train, y_train], axis=1)
-
-# 将形状为 (105, 3) 的数组重新整形为 (105, 2, 1)
 test_data = np.concatenate([x_test, y_test], axis=1)
 
 
@@ -98,8 +90,8 @@ def sigmoid(in_x):
 class BPNet:
     def __init__(self):
         # 超参数
-        input_size = 2
-        hidden_size = 6
+        input_size = 4
+        hidden_size = 8
         output_size = 3
         self.L2_param = 0.001
 
@@ -121,44 +113,35 @@ class BPNet:
         learning_rate = learning_rate
         last_test_loss = 99999.0
         flag_num = 0
-        num_epochs = 20000
+        num_epochs = 100000
         animator = Animator(xlabel='epoch', xlim=[1, num_epochs],
                                     legend=['train loss', 'test loss'])
 
         for epoch in tqdm(range(num_epochs), desc='Training'):
-            for X1, X2, y in train_data:
+            for X1, X2, X3, X4, y in train_data:
                 Y = [0, 0, 0]
                 Y[int(y)] = 1
-                X = np.array([[X1, X2]])
+                X = np.array([[X1, X2, X3, X4]])
                 # 前向传播
                 z1 = X@self.W1 + self.b1
                 a1 = sigmoid(z1)
-
-                # keep_prob = 0.93
-                # # dropout
-                # mask = (np.random.rand(*a1.shape) < keep_prob) / keep_prob
-                # a1 = a1 * mask
-
                 z2 = a1@self.W2 + self.b2
                 a2 = sigmoid(z2)
-
                 # 计算损失（均方误差）
                 train_loss = np.mean(np.square(Y - a2))
-
                 # 反向传播
                 d2 = (a2 - Y) * a2 * (1 - a2)
                 d1 = d2@self.W2.T * a1 * (1 - a1)
-
                 # 更新权重和偏差
                 self.W2 -= learning_rate * (np.dot(a1.T, d2) + self.L2_param * self.W2)
                 self.b2 -= learning_rate * np.sum(d2, axis=0, keepdims=True)
                 self.W1 -= learning_rate * (np.dot(X.T, d1) + self.L2_param * self.W1)
                 self.b1 -= learning_rate * np.sum(d1, axis=0, keepdims=True)
 
-            for X1, X2, y in test_data:
+            for X1, X2, X3, X4, y in test_data:
                 Y = [0, 0, 0]
                 Y[int(y)] = 1
-                X = np.array([[X1, X2]])
+                X = np.array([[X1, X2, X3, X4]])
                 # 前向传播
                 z1 = X@self.W1 + self.b1
                 a1 = sigmoid(z1)
@@ -181,10 +164,10 @@ class BPNet:
             #
             # last_test_loss = test_loss
 
-            if (epoch + 1) % 100 == 0 :
+            if (epoch + 1) % 100 == 0:
                 animator.add(epoch + 1, (train_loss, test_loss))
-            if (epoch + 1) % 1000 == 0 :
-                print(epoch + 1, train_loss, test_loss)
+            if (epoch + 1) % 1000 == 0:
+                print(f"[epoch: {epoch + 1} || train_loss: {train_loss} || test_loss: {test_loss}]")
 
         np.savez('./saved_weights.npz', W1=self.W1, B1=self.b1, W2=self.W2, B2=self.b2)
         plt.show()

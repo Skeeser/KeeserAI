@@ -62,6 +62,7 @@ def calcShannonEnt(dataSet):
 def splitDataSet(data_set, axis_t, value):
     ret_dataset = []
     for feat_vec in data_set:
+        # 为属性的每一个可能值生成新的节点数据集
         if feat_vec[axis_t] == value:
             reduced_feat_vec = feat_vec[:axis_t]
             reduced_feat_vec = np.concatenate([reduced_feat_vec, feat_vec[axis_t + 1:]], axis=0)
@@ -122,7 +123,7 @@ def majority_cnt(class_list):
 
 
 def creat_tree(dataSet, labels, featLabels):
-    # 取分类标签(是否放贷：yes or no)
+    # 取分类标签
     class_list = [exampel[-1] for exampel in dataSet]
     # 如果类别完全相同则停止分类
     if class_list.count(class_list[0]) == len(class_list):
@@ -130,10 +131,11 @@ def creat_tree(dataSet, labels, featLabels):
     # 遍历完所有特征时返回出现次数最多的类标签
     if len(dataSet[0]) == 1:
         return majority_cnt(class_list)
-    # 选择最优特征
+    # 选择最优特征(信息增益最大)
     best_feature = chooseBestFeatureToSplit(dataSet)
     # 最优特征的标签
     best_feature_label = labels[best_feature]
+    # if not if_in_featLabels(featLabels, best_feature_label):
     featLabels.append(best_feature_label)
     # 根据最优特征的标签生成树
     my_tree = {best_feature_label: {}}
@@ -144,7 +146,13 @@ def creat_tree(dataSet, labels, featLabels):
     # 去掉重复属性值
     unique_vls = set(feat_value)
     for value in unique_vls:
-        my_tree[best_feature_label][value] = creat_tree(splitDataSet(dataSet, best_feature, value), labels, featLabels)
+        # 划分新的数据集
+        new_data_set = splitDataSet(dataSet, best_feature, value)
+        # 浅拷贝
+        new_labels = labels.copy()
+        new_featLabel = featLabels.copy()
+        # 递归建树
+        my_tree[best_feature_label][value] = creat_tree(new_data_set, new_labels, new_featLabel)
     return my_tree
 
 
@@ -180,7 +188,7 @@ def classify(input_tree, feat_labels, test_vec):
     # 下一个字典
     second_dict = input_tree[first_str]
     feat_index = feat_labels.index(first_str)
-
+    class_label = -1
     for key in second_dict.keys():
         if test_vec[feat_index] == key:
             if type(second_dict[key]).__name__ == 'dict':
@@ -207,32 +215,19 @@ if __name__ == "__main__":
     labels = ['花萼长度', '花萼宽度', '花瓣长度', '花瓣宽度']
 
     print("经验熵为: ", calcShannonEnt(train_data))
-
+    input_labels = labels.copy()
     featLabels = []
-    myTree = creat_tree(train_data, labels, featLabels)
-    print(myTree)
-    print(get_tree_depth(myTree))
-    print(get_num_leaves(myTree))
+    myTree = creat_tree(train_data, input_labels, featLabels)
+    print("打印决策树如下:\n", myTree)
+    print("决策树深度为: ", get_tree_depth(myTree))
+    print("决策树叶子数为: ", get_num_leaves(myTree))
 
-    # 测试数据
-    testVec = [0, 1, 1, 1]
-    result = classify(myTree, featLabels, testVec)
+    # 测试测试集的准确度
+    right_num = 0
+    for testVec in test_data:
+        target_label = testVec[-1]
+        result = classify(myTree, labels, testVec)
+        if target_label == result:
+            right_num += 1
 
-    if result == 'yes':
-        print('放贷')
-    if result == 'no':
-        print('不放贷')
-
-    # 存储树
-    storeTree(myTree, 'classifierStorage.txt')
-
-    # 读取树
-    myTree2 = grabTree('classifierStorage.txt')
-    print(myTree2)
-
-    testVec2 = [1, 0]
-    result2 = classify(myTree2, featLabels, testVec)
-    if result2 == 'yes':
-        print('放贷')
-    if result2 == 'no':
-        print('不放贷')
+    print("测试集准确度为: ", right_num / len(test_data))
