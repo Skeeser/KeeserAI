@@ -2,12 +2,11 @@ import math
 
 import numpy as np
 from sklearn import model_selection  # 仅仅用来划分数据集
-import matplotlib.pyplot as plt
-from tqdm import tqdm
-import os
 from math import log
 import operator
 import pickle
+import matplotlib.pyplot as plt
+plt.switch_backend('agg')
 
 
 # 将字符串转为整型，便于数据加载
@@ -68,7 +67,7 @@ def splitDataSet(data_set, axis_t, value):
             ret_dataset.append(reduced_feat_vec)
     return ret_dataset
 
-
+# 计算信息增益
 def chooseBestFeatureToSplit(dataSet):
     # 特征数量
     num_features = len(dataSet[0]) - 1
@@ -97,15 +96,15 @@ def chooseBestFeatureToSplit(dataSet):
         # 信息增益
         info_gain = base_entropy - new_entropy
         # 打印每个特征的信息增益
-        print("第%d个特征的信息增益为%.3f" % (i, info_gain))
+        # print("第%d个特征的信息增益为%.3f" % (i, info_gain))
         # 计算信息增益
         if info_gain > best_info_gain:
             # 更新信息增益
             best_info_gain = info_gain
             # 记录信息增益最大的特征的索引值
             best_feature = i
-    print("最优索引值：" + str(best_feature))
-    print()
+    # print("最优索引值：" + str(best_feature))
+    # print()
     return best_feature
 
 
@@ -122,7 +121,6 @@ def majority_cnt(class_list):
 
 
 def creat_tree(dataSet, labels, featLabels):
-    # 取分类标签
     class_list = [exampel[-1] for exampel in dataSet]
     # 如果类别完全相同则停止分类
     if class_list.count(class_list[0]) == len(class_list):
@@ -187,23 +185,19 @@ def classify(input_tree, feat_labels, test_vec):
     # 下一个字典
     second_dict = input_tree[first_str]
     feat_index = feat_labels.index(first_str)
-    # class_label = -1
     res_diff = []
     second_dict_keys = []
     for key in second_dict.keys():
         second_dict_keys.append(key)
         res_diff.append(math.pow((test_vec[feat_index] - key), 2))
-
     # 获取误差最小的index
     min_tmp = min(res_diff)
     index = res_diff.index(min_tmp)
-
     new_key = second_dict_keys[index]
     if type(second_dict[new_key]).__name__ == 'dict':
         class_label = classify(second_dict[new_key], feat_labels, test_vec)
     else:
         class_label = second_dict[new_key]
-
     return class_label
 
 
@@ -222,7 +216,7 @@ def grabTree(filename):
 if __name__ == "__main__":
     # 分类属性
     labels = ['花萼长度', '花萼宽度', '花瓣长度', '花瓣宽度']
-
+    print()
     print("经验熵为: ", calcShannonEnt(train_data))
     input_labels = labels.copy()
     featLabels = []
